@@ -1,0 +1,5 @@
+temp_asar_extracted/
+temp_patched.asar
+*.bak
+__pycache__/
+.DS_Store
