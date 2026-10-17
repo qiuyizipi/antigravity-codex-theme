@@ -139,65 +139,94 @@ main,
     padding-right: 12px !important;
 }
 
-/* 5. 用户提问气泡 (User Bubble) - 兼容 Antigravity 2.24.0+ 与历史版本 */
+
+/* 5. 用户提问气泡 (User Bubble) - 1:1 对齐 Codex 原版效果 (单层浅蓝胶囊、纯净无描边) */
 [data-testid="user-input-step"] {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-end !important;
-    padding-top: 1rem !important;
+    padding-top: 0.75rem !important;
     padding-bottom: 0.5rem !important;
     width: 100% !important;
 }
 
 /* 限制提问容器宽度并居右 */
-[data-testid="user-input-step"] > div,
-[data-testid="user-input-step"] [data-testid="lifted-context-menu-trigger"] {
+[data-testid="user-input-step"] > div {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     width: fit-content !important;
-    max-width: 85% !important;
+    max-width: 82% !important;
     margin-left: auto !important;
+    position: relative !important;
 }
 
-/* 提问气泡卡片 (自适应 2.24.0+ 与历史版本) */
-[data-testid="user-input-step"] .bg-card-border,
-[data-testid="user-input-step"] .bg-card,
+/* 彻底消除外层 .bg-card-border 模拟边框与背景 (杜绝双重嵌套框) */
+[data-testid="user-input-step"] .bg-card-border {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* 唯一定义内层卡片为 Codex 天空蓝胶囊 (单层圆角，彻底消除重叠边框与生硬描边) */
+[data-testid="user-input-step"] .bg-card-border > .bg-card,
+[data-testid="conversation-view"] [data-testid="user-input-step"] .bg-card-border > .bg-card,
 [data-testid="user-input-step"] [data-testid="lifted-context-menu-trigger"] > div {
     background-color: #EBF3FE !important;
-    border: 1px solid #C4DEFD !important;
+    border: none !important;
     border-radius: 20px !important;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06) !important;
+    padding: 8px 18px !important;
+    box-shadow: none !important;
+    position: relative !important;
+    width: fit-content !important;
+    margin-left: auto !important;
+    overflow: visible !important;
 }
 
-[data-testid="user-input-step"] .bg-card-border {
-    padding: 0 !important;
-}
-
-[data-testid="user-input-step"] .bg-card {
-    padding: 10px 18px !important;
-}
-
-/* 解除长提问的高度截断 */
-[data-testid="user-input-step"] [class*="max-h-"] {
+/* 解除长提问的高度截断与溢出隐藏 */
+[data-testid="user-input-step"] [class*="max-h-"],
+[data-testid="user-input-step"] .overflow-hidden {
     max-height: none !important;
     overflow: visible !important;
 }
 
-/* 用户提问文字 */
+/* 用户提问文字 - 1:1 对齐 Codex 字体与色彩 (深黑青色、平实字重、护眼自然) */
 [data-testid="user-input-step"] [data-quotable="true"],
 [data-testid="user-input-step"] .whitespace-pre-wrap,
-[data-testid="user-input-step"] p,
-[data-testid="user-input-step"] span {
+[data-testid="user-input-step"] p {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif !important;
     font-size: 15px !important;
-    line-height: 1.65 !important;
-    color: #0f4c81 !important;
-    font-weight: 450 !important;
+    line-height: 1.6 !important;
+    color: #0f172a !important;
+    font-weight: 400 !important;
 }
 
+/* 悬停操作按钮与时间戳：移到气泡左侧外部，坚决不遮挡气泡内文字！ */
 [data-testid="user-input-step"] .user-input-buttons-container {
-    background-color: transparent !important;
+    position: absolute !important;
+    right: calc(100% + 8px) !important;
+    bottom: 50% !important;
+    top: auto !important;
+    left: auto !important;
+    transform: translateY(50%) !important;
+    background-color: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(4px) !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 9999px !important;
+    padding: 2px 8px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+    z-index: 30 !important;
+    white-space: nowrap !important;
 }
+
+[data-testid="user-input-step"] .user-input-buttons-container span,
+[data-testid="user-input-step"] .user-input-buttons-container button {
+    color: #64748b !important;
+    font-size: 12px !important;
+}
+
 
 /* 6. AI 回答正文区域 (Assistant Response) - 1:1 对齐 Codex 15px/25px 严谨排版 */
 [data-testid="conversation-view"] p,
@@ -384,7 +413,7 @@ button:has(> [class*="tabular-nums"]) {
 }
 
 /* 底部区域背景保持纯白 */
-[data-testid="conversation-view"] .bg-card,
+[data-testid="conversation-view"] .bg-card:not([data-testid="user-input-step"] *),
 [data-testid="conversation-view"] .bg-background {
     background-color: #FFFFFF !important;
 }
