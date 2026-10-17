@@ -139,31 +139,43 @@ main,
     padding-right: 12px !important;
 }
 
-/* 5. 用户提问气泡 (User Bubble) - Codex 天空蓝轻盈圆角胶囊 */
+/* 5. 用户提问气泡 (User Bubble) - 兼容 Antigravity 2.24.0+ 与历史版本 */
 [data-testid="user-input-step"] {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-end !important;
-    padding-top: 1.25rem !important;
-    padding-bottom: 0.75rem !important;
+    padding-top: 1rem !important;
+    padding-bottom: 0.5rem !important;
+    width: 100% !important;
 }
 
+/* 限制提问容器宽度并居右 */
+[data-testid="user-input-step"] > div,
 [data-testid="user-input-step"] [data-testid="lifted-context-menu-trigger"] {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     width: fit-content !important;
-    max-width: 82% !important;
+    max-width: 85% !important;
     margin-left: auto !important;
 }
 
+/* 提问气泡卡片 (自适应 2.24.0+ 与历史版本) */
+[data-testid="user-input-step"] .bg-card-border,
+[data-testid="user-input-step"] .bg-card,
 [data-testid="user-input-step"] [data-testid="lifted-context-menu-trigger"] > div {
     background-color: #EBF3FE !important;
     border: 1px solid #C4DEFD !important;
     border-radius: 20px !important;
-    padding: 10px 18px !important;
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06) !important;
-    width: fit-content !important;
+}
+
+[data-testid="user-input-step"] .bg-card-border {
+    padding: 0 !important;
+}
+
+[data-testid="user-input-step"] .bg-card {
+    padding: 10px 18px !important;
 }
 
 /* 解除长提问的高度截断 */
@@ -174,11 +186,17 @@ main,
 
 /* 用户提问文字 */
 [data-testid="user-input-step"] [data-quotable="true"],
-[data-testid="user-input-step"] .whitespace-pre-wrap {
+[data-testid="user-input-step"] .whitespace-pre-wrap,
+[data-testid="user-input-step"] p,
+[data-testid="user-input-step"] span {
     font-size: 15px !important;
     line-height: 1.65 !important;
     color: #0f4c81 !important;
     font-weight: 450 !important;
+}
+
+[data-testid="user-input-step"] .user-input-buttons-container {
+    background-color: transparent !important;
 }
 
 /* 6. AI 回答正文区域 (Assistant Response) - 1:1 对齐 Codex 15px/25px 严谨排版 */
@@ -323,7 +341,9 @@ main,
 
 /* 9. 工具步骤与思考折叠栏 - 1:1 对齐 Codex "用时 xx >" 的极简线条风格 */
 [data-testid="tool-group-collapsible"],
-[data-testid="worked-for-collapsible"] {
+[data-testid="worked-for-collapsible"],
+[data-testid="thinking-collapsible-trigger"],
+button:has(> [class*="tabular-nums"]) {
     opacity: 0.8 !important;
     font-size: 13px !important;
     margin-top: 4px !important;
@@ -335,7 +355,8 @@ main,
     transition: all 0.2s ease-in-out !important;
 }
 [data-testid="tool-group-collapsible"]:hover,
-[data-testid="worked-for-collapsible"]:hover {
+[data-testid="worked-for-collapsible"]:hover,
+[data-testid="thinking-collapsible-trigger"]:hover {
     opacity: 1 !important;
     background-color: #f3f4f6 !important;
     color: #111827 !important;
