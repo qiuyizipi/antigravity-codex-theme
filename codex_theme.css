@@ -1,70 +1,67 @@
 /* ==========================================================================
-   Antigravity 1:1 Codex Pixel-Perfect Aesthetic Theme (v3.0 True-Token Edition)
-   所有色值、字号、圆角、抗锯齿与排版令牌直接对齐 OpenAI Codex 桌面端原生设计系统
+   Antigravity 1:1 Codex Mirror Aesthetic Theme (v4.0 Full-Screen Mirror Edition)
+   基于同屏像素级实测对齐 OpenAI Codex 桌面端：通透云母顶栏、极简无时间戳边栏、
+   无缝纯白主画布、15px ClearType 饱满字形、720px 上下齐平舒展输入框
    ========================================================================== */
 
-/* 1. 全局设计令牌、字重重置与抗锯齿渲染 */
+/* 1. 全局设计令牌、字重重置与 Windows ClearType 清晰渲染 */
 :root, .theme-light, html, body {
-    /* Codex 原生中性灰阶与主表面 */
     --color-background: #FFFFFF !important;
-    --sidebar: #F9F9F9 !important;
-    --color-sidebar: #F9F9F9 !important;
-    --color-sidebar-secondary: #EAEAEA !important;
+    --sidebar: #F7FAFA !important;
+    --color-sidebar: #F7FAFA !important;
+    --color-sidebar-secondary: #E9EFEF !important;
     --color-card: #FFFFFF !important;
-    --vscode-sideBar-background: #F9F9F9 !important;
-    --vscode-titleBar-activeBackground: #F9F9F9 !important;
+    --vscode-sideBar-background: #F7FAFA !important;
+    --vscode-titleBar-activeBackground: #EAF8F5 !important;
 
-    /* 统一正文与底部输入框黄金阅读宽度，彻底消除上下错位 */
-    --max-conversation-width: 760px !important;
+    /* 对齐 Codex 实拍图黄金阅读宽 (~720px)，正文与底部输入框严格上下垂直对齐 */
+    --max-conversation-width: 720px !important;
 
-    /* Codex Windows 原生字体栈 + 灰度平滑抗锯齿 (消除 150% DPI 亚像素毛刺) */
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif !important;
-    -webkit-font-smoothing: antialiased !important;
-    -moz-osx-font-smoothing: grayscale !important;
-    text-rendering: optimizeLegibility !important;
+    /* Windows 原生清晰字体栈 + ClearType 次像素渲染 (确保 15px 汉字饱满黑实不发虚) */
+    font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif !important;
+    -webkit-font-smoothing: subpixel-antialiased !important;
+    text-rendering: auto !important;
 
-    /* 根除 Antigravity 2.32+ 默认 350 瘦弱字重，对齐 Codex #1A1C1F 温润墨色 */
+    /* 彻底消除 Antigravity 2.32+ 默认 350 瘦弱字重 */
     font-weight: 400 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
 }
 
-/* 2. 顶部菜单栏与标题区 (与侧边栏融为一体，去除生硬横线切割) */
-[data-testid="title-menu-bar"],
-.bg-sidebar {
-    background-color: #F9F9F9 !important;
-}
+/* 2. 顶部窗体菜单栏 - 复刻 Codex 顶部清透浅薄荷云母柔光，去除生硬黑线切割 */
 [data-testid="title-menu-bar"] {
-    border-bottom: 1px solid rgba(26, 28, 31, 0.06) !important;
+    background: linear-gradient(90deg, #EBF8F6 0%, #EFFAF6 50%, #F4FBF4 100%) !important;
+    border-bottom: none !important;
     font-size: 13px !important;
-    color: #1A1C1F !important;
+    color: #1F2937 !important;
 }
 
-/* 3. 左侧边栏 (Left Sidebar) - Codex 标志性 #F9F9F9 柔灰、紧凑精致行高 */
+/* 3. 左侧边栏 (Left Sidebar) - Codex 清透冰白底色、隐藏右侧杂乱时间戳、极细滚动条 */
 aside,
+.bg-sidebar,
 [data-testid="conversation-list-sidebar"],
 [class*="sidebar"]:not([data-testid="toggle-aux-sidebar"]) {
-    background-color: #F9F9F9 !important;
+    background-color: #F7FAFA !important;
 }
 
 div:has(> [data-testid="conversation-list-sidebar"]),
 aside {
-    border-right: 1px solid rgba(26, 28, 31, 0.07) !important;
-    background-color: #F9F9F9 !important;
+    border-right: 1px solid rgba(15, 23, 42, 0.06) !important;
+    background-color: #F7FAFA !important;
 }
 
-/* 侧边栏吸顶分组头：实心浅灰底 + 柔和微距，彻底防止滚过半格时文字穿模 */
+/* 侧边栏吸顶分组头：实心浅底防滚动穿模 */
 [data-testid="conversation-list-sidebar"] [style*="sticky"],
 [data-testid="conversation-list-sidebar"] .sticky {
-    background-color: #F9F9F9 !important;
+    background-color: #F7FAFA !important;
     padding-top: 4px !important;
     padding-bottom: 5px !important;
-    box-shadow: 0 2px 4px -2px #F9F9F9 !important;
+    box-shadow: 0 2px 4px -2px #F7FAFA !important;
 }
 
-/* 会话列表行：回归 Codex 紧凑轻盈的 31px 行高与 13px 精致字号 */
+/* 会话列表行：对齐 Codex 32px 舒适行高与清晰 13.5px 字体 */
 [data-testid="conversation-row-sidebar"] {
-    min-height: 31px !important;
-    padding: 4px 10px !important;
+    min-height: 32px !important;
+    padding: 5px 10px !important;
     border-radius: 8px !important;
     margin-bottom: 1px !important;
     transition: background-color 0.12s ease !important;
@@ -72,15 +69,15 @@ aside {
 
 [data-testid="conversation-row-sidebar"] span.truncate,
 [data-testid="conversation-row-sidebar"] .truncate {
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     line-height: 20px !important;
     font-weight: 400 !important;
     color: #1A1C1F !important;
 }
 
-/* 激活选中项：Codex 中性柔灰微胶囊 (替代冷青蓝灰) */
+/* 激活选中项：Codex 柔和中性灰胶囊 */
 [data-testid="conversation-row-sidebar"].bg-sidebar-secondary {
-    background-color: rgba(26, 28, 31, 0.075) !important;
+    background-color: rgba(15, 23, 42, 0.075) !important;
     border-radius: 8px !important;
 }
 [data-testid="conversation-row-sidebar"].bg-sidebar-secondary span.truncate {
@@ -88,15 +85,21 @@ aside {
     font-weight: 500 !important;
 }
 [data-testid="conversation-row-sidebar"]:hover {
-    background-color: rgba(26, 28, 31, 0.04) !important;
+    background-color: rgba(15, 23, 42, 0.04) !important;
     border-radius: 8px !important;
 }
 
-/* 会话时间戳：轻盈柔和中灰 */
-[data-testid="conversation-row-sidebar"] .text-xs {
+/* 净化左边栏：默认彻底隐藏每行右侧杂乱的 "17小时前 / 2天前" 时间戳，仅在鼠标悬停时单行显现 */
+[data-testid="conversation-row-sidebar"] .tabular-nums {
+    display: none !important;
+    white-space: nowrap !important;
     font-size: 11.5px !important;
-    opacity: 0.72 !important;
     color: #6B7280 !important;
+}
+[data-testid="conversation-row-sidebar"]:hover .tabular-nums {
+    display: inline-block !important;
+    opacity: 0.65 !important;
+    margin-left: 6px !important;
 }
 
 /* 分组小标 (置顶会话 / 项目 / 会话) */
@@ -117,7 +120,7 @@ aside {
     color: #374151 !important;
 }
 
-/* 侧边栏“显示全部 (N)”/“收起”等折叠控制按钮：统一精致 12.5px */
+/* 侧边栏“显示全部 (N)”/“收起”等折叠控制按钮 */
 [data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button) {
     font-size: 12.5px !important;
     line-height: 18px !important;
@@ -126,7 +129,7 @@ aside {
     padding-bottom: 4px !important;
 }
 
-/* 左侧顶部与底部导航按钮：Codex 一体化无边框轻盈导航风格 */
+/* 左侧顶部与底部导航按钮：Codex 一体化无边框轻盈导航 */
 [data-testid="new-conversation-button"],
 [data-testid="new-conversation-button"].bg-background,
 [data-testid="history-button"],
@@ -134,7 +137,7 @@ aside {
 [data-testid="settings-button"],
 [data-testid="sidebar-navigation-items"] button {
     min-height: 32px !important;
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     font-weight: 450 !important;
     padding: 5px 10px !important;
     gap: 8px !important;
@@ -150,10 +153,29 @@ aside {
 [data-testid="automations-button"]:hover,
 [data-testid="settings-button"]:hover,
 [data-testid="sidebar-navigation-items"] button:hover {
-    background-color: rgba(26, 28, 31, 0.05) !important;
+    background-color: rgba(15, 23, 42, 0.05) !important;
 }
 
-/* 4. 主对话视口 (Main Chat Canvas) - 纯白净空 + 黄金视宽 + 底部呼吸留白 */
+/* 极细隐形滚动条滑块 (彻底消除粗黑突兀竖条) */
+[data-testid="overlay-scrollbar-thumb"] {
+    width: 3.5px !important;
+    background-color: rgba(15, 23, 42, 0.14) !important;
+}
+[data-testid="overlay-scrollbar"]:hover [data-testid="overlay-scrollbar-thumb"] {
+    width: 5px !important;
+    background-color: rgba(15, 23, 42, 0.28) !important;
+}
+
+/* 4. 主对话视口 (Main Chat Canvas) - 彻底去除 8px 外圈灰缝与 12px 盒感，无缝通透纯白铺满 */
+.browser-hole-opaque:has([data-testid="conversation-view"]) {
+    background-color: #FFFFFF !important;
+}
+.browser-hole-opaque:has([data-testid="conversation-view"]) > div:has([data-testid="conversation-view"]) {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
 [data-testid="conversation-view"],
 [data-testid="autoscroll-viewport"],
 main,
@@ -161,37 +183,36 @@ main,
     background-color: #FFFFFF !important;
 }
 
-/* 约束正文最大阅读宽度至 760px，与底部输入框 100% 垂直左右对齐 */
+/* 约束正文最大阅读宽度至 720px，与底部输入框 100% 垂直左右对齐 */
 [data-testid="autoscroll-viewport"] > div {
-    max-width: 760px !important;
+    max-width: 720px !important;
     margin-left: auto !important;
     margin-right: auto !important;
     width: 100% !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
-    padding-bottom: 40px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-bottom: 44px !important;
 }
 
 /* 弱化左侧消息跳转圆点轨的默认视觉干扰，悬停时浮现 */
 [data-testid="conversation-navigator"] {
-    opacity: 0.22 !important;
+    opacity: 0.18 !important;
     transition: opacity 0.2s ease !important;
 }
 [data-testid="conversation-navigator"]:hover {
-    opacity: 0.9 !important;
+    opacity: 0.85 !important;
 }
 
-/* 5. 用户提问气泡 (User Bubble) - 1:1 对齐 Codex 原生 #E8F3FE / #0C274A 无边框胶囊 */
+/* 5. 用户提问气泡 (User Bubble) - 1:1 复刻 Codex 实拍 #E9F2FB / #0C274A 饱满无边胶囊 */
 [data-testid="user-input-step"] {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-end !important;
-    padding-top: 0.85rem !important;
-    padding-bottom: 0.45rem !important;
+    padding-top: 0.9rem !important;
+    padding-bottom: 0.5rem !important;
     width: 100% !important;
 }
 
-/* 2.32+ 容器保持 100% 宽度，交由内部 max-w-[80%] 控制换行，彻底避免短文本提前折行 */
 [data-testid="user-input-step"] > div:not([data-testid="user-message-actions"]) {
     background: transparent !important;
     border: none !important;
@@ -200,7 +221,6 @@ main,
     max-width: 100% !important;
 }
 
-/* 兼容历史 2.12 版本的触发器宽度 */
 [data-testid="user-input-step"] [data-testid="lifted-context-menu-trigger"] {
     background: transparent !important;
     border: none !important;
@@ -210,7 +230,6 @@ main,
     margin-left: auto !important;
 }
 
-/* 彻底消除外层 .bg-card-border / .agy-user-bubble-frame 模拟边框 */
 [data-testid="user-input-step"] .bg-card-border,
 [data-testid="user-input-step"] .agy-user-bubble-frame {
     background: transparent !important;
@@ -220,16 +239,15 @@ main,
     margin: 0 !important;
 }
 
-/* 唯一内层气泡胶囊：精确复刻 Codex #E8F3FE 无描边柔和胶囊 */
 [data-testid="user-input-step"] .bg-card-border > .bg-card,
 [data-testid="conversation-view"] [data-testid="user-input-step"] .bg-card-border > .bg-card,
 [data-testid="user-input-step"] .agy-user-bubble,
 [data-testid="user-message-bubble"],
 [data-testid="user-input-step"] [data-testid="lifted-context-menu-trigger"] > div {
-    background-color: #E8F3FE !important;
+    background-color: #E9F2FB !important;
     border: none !important;
-    border-radius: 20px !important;
-    padding: 8px 16px !important;
+    border-radius: 22px !important;
+    padding: 9px 18px !important;
     box-shadow: none !important;
     position: relative !important;
     width: fit-content !important;
@@ -237,26 +255,25 @@ main,
     overflow: visible !important;
 }
 
-/* 解除长提问高度截断 */
 [data-testid="user-input-step"] [class*="max-h-"],
 [data-testid="user-input-step"] .overflow-hidden {
     max-height: none !important;
     overflow: visible !important;
 }
 
-/* 提问文字：1:1 对齐 Codex --compact-message-bubble-foreground (#0C274A) */
+/* 提问文字：15px 饱满清晰，对齐 Codex 实拍比例 */
 [data-testid="user-input-step"] [data-quotable="true"],
 [data-testid="user-input-step"] .whitespace-pre-wrap,
 [data-testid="user-input-step"] p,
 [data-testid="user-message-content"] {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif !important;
-    font-size: 14px !important;
-    line-height: 1.62 !important;
+    font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
     color: #0C274A !important;
     font-weight: 400 !important;
 }
 
-/* 2.32+ 用户消息下方操作栏：轻盈低调、无多余边框 */
+/* 2.32+ 用户消息下方操作栏：极低调透明 */
 [data-testid="user-message-actions"] {
     background: transparent !important;
     border: none !important;
@@ -265,11 +282,11 @@ main,
 }
 [data-testid="user-message-actions"] span,
 [data-testid="user-message-actions"] button {
-    color: #6B7280 !important;
+    color: #9CA3AF !important;
     font-size: 11.5px !important;
 }
 
-/* 兼容 2.24 旧版气泡内悬停按钮：移至气泡左外侧，绝不遮挡文字 */
+/* 兼容 2.24 旧版气泡内悬停按钮 */
 [data-testid="user-input-step"] .user-input-buttons-container {
     position: absolute !important;
     right: calc(100% + 8px) !important;
@@ -279,33 +296,27 @@ main,
     transform: translateY(50%) !important;
     background-color: rgba(255, 255, 255, 0.96) !important;
     backdrop-filter: blur(4px) !important;
-    border: 1px solid rgba(26, 28, 31, 0.09) !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
     border-radius: 9999px !important;
     padding: 2px 8px !important;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
     z-index: 30 !important;
     white-space: nowrap !important;
 }
-[data-testid="user-input-step"] .user-input-buttons-container span,
-[data-testid="user-input-step"] .user-input-buttons-container button {
-    color: #6B7280 !important;
-    font-size: 11.5px !important;
-}
 
-/* 6. AI 回答正文区域 (Assistant Response) - 1:1 复刻 Codex 14px / 1.65 舒展精致排版 */
+/* 6. AI 回答正文区域 (Assistant Response) - 1:1 复刻 Codex 实拍 15px 饱满黑实清晰字形 */
 [data-testid="conversation-view"] p,
 [data-testid="planner-response-text"] p,
 .prose p {
-    font-size: 14px !important;
-    line-height: 1.65 !important;
-    color: #1A1C1F !important;
+    font-size: 15px !important;
+    line-height: 1.66 !important;
+    color: #0D0D0D !important;
     margin-top: 0 !important;
-    margin-bottom: 10px !important;
+    margin-bottom: 11px !important;
     font-weight: 400 !important;
     letter-spacing: 0px !important;
 }
 
-/* 列表容器：清除 350 字重继承，对齐 Codex 紧凑悬挂缩进 */
 [data-testid="conversation-view"] ul,
 [data-testid="planner-response-text"] ul,
 .prose ul {
@@ -313,10 +324,10 @@ main,
     list-style-position: outside !important;
     padding-left: 1.35rem !important;
     margin-top: 4px !important;
-    margin-bottom: 10px !important;
-    font-size: 14px !important;
+    margin-bottom: 11px !important;
+    font-size: 15px !important;
     font-weight: 400 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
 }
 
 [data-testid="conversation-view"] ol,
@@ -326,88 +337,85 @@ main,
     list-style-position: outside !important;
     padding-left: 1.35rem !important;
     margin-top: 4px !important;
-    margin-bottom: 10px !important;
-    font-size: 14px !important;
+    margin-bottom: 11px !important;
+    font-size: 15px !important;
     font-weight: 400 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
 }
 
 [data-testid="conversation-view"] li,
 [data-testid="planner-response-text"] li,
 .prose li {
-    font-size: 14px !important;
-    line-height: 1.65 !important;
-    color: #1A1C1F !important;
-    margin-bottom: 4px !important;
+    font-size: 15px !important;
+    line-height: 1.66 !important;
+    color: #0D0D0D !important;
+    margin-bottom: 5px !important;
     padding-left: 3px !important;
     font-weight: 400 !important;
 }
 
 [data-testid="conversation-view"] li::marker,
 .prose li::marker {
-    color: #5D6470 !important;
+    color: #4B5563 !important;
     font-weight: 400 !important;
 }
 
-/* 标题层次：细腻克制，无大块黑斑刺眼感 */
+/* 标题层次 */
 [data-testid="conversation-view"] h1,
 .prose h1 {
-    font-size: 17.5px !important;
+    font-size: 18.5px !important;
     line-height: 1.4 !important;
     font-weight: 600 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
     margin-top: 18px !important;
     margin-bottom: 8px !important;
 }
 [data-testid="conversation-view"] h2,
 .prose h2 {
-    font-size: 15.5px !important;
+    font-size: 16.5px !important;
     line-height: 1.45 !important;
     font-weight: 600 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
     margin-top: 16px !important;
     margin-bottom: 8px !important;
 }
 [data-testid="conversation-view"] h3,
 .prose h3 {
-    font-size: 14.5px !important;
+    font-size: 15.5px !important;
     line-height: 1.45 !important;
     font-weight: 600 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
     margin-top: 14px !important;
     margin-bottom: 6px !important;
 }
 [data-testid="conversation-view"] h4,
 .prose h4 {
-    font-size: 14px !important;
+    font-size: 15px !important;
     line-height: 1.5 !important;
     font-weight: 600 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
     margin-top: 10px !important;
     margin-bottom: 4px !important;
 }
 
-/* 强调文字 strong / b */
 [data-testid="conversation-view"] strong,
 [data-testid="conversation-view"] b,
 .prose strong,
 .prose b {
     font-weight: 600 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
 }
 
-/* 分割线：极轻柔和 */
 [data-testid="conversation-view"] hr,
 .prose hr {
-    border-color: rgba(26, 28, 31, 0.08) !important;
+    border-color: rgba(15, 23, 42, 0.08) !important;
     margin-top: 14px !important;
     margin-bottom: 14px !important;
 }
 
-/* 引用块：Codex 极简左细线风格 */
 [data-testid="conversation-view"] blockquote,
 .prose blockquote {
-    border-left: 2.5px solid rgba(26, 28, 31, 0.18) !important;
+    border-left: 2.5px solid rgba(15, 23, 42, 0.18) !important;
     background-color: #FAFAFA !important;
     padding: 6px 14px !important;
     border-radius: 0 6px 6px 0 !important;
@@ -415,14 +423,25 @@ main,
     margin: 8px 0 12px !important;
 }
 
-/* 7. 行内代码胶囊 (Inline Code Pill) - 1:1 复刻 Codex .inline-markdown 饱满圆角胶囊 */
+/* 弱化每条 AI 回答底部的 "14小时前 [复制][赞][踩]"，平时低调不割裂阅读，悬停显现 */
+[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="复制"]),
+[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="Copy"]) {
+    opacity: 0.35 !important;
+    transition: opacity 0.18s ease !important;
+}
+[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="复制"]):hover,
+[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="Copy"]):hover {
+    opacity: 1 !important;
+}
+
+/* 7. 行内代码胶囊 (Inline Code Pill) - 1:1 匹配 15px 正文的圆润饱满胶囊 */
 [data-testid="conversation-view"] code:not(pre code),
 [data-testid="planner-response-text"] code:not(pre code),
 .prose code:not(pre code) {
     font-family: "Cascadia Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace !important;
-    font-size: 0.9em !important;
-    background-color: rgba(26, 28, 31, 0.058) !important;
-    color: #1A1C1F !important;
+    font-size: 13.5px !important;
+    background-color: rgba(15, 23, 42, 0.055) !important;
+    color: #0D0D0D !important;
     padding: 1.5px 6px !important;
     border-radius: 6px !important;
     border: none !important;
@@ -437,46 +456,46 @@ main,
 .prose pre {
     font-family: "Cascadia Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace !important;
     border-radius: 10px !important;
-    border: 1px solid rgba(26, 28, 31, 0.08) !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
     background-color: #F8F9FA !important;
     box-shadow: none !important;
     margin-top: 8px !important;
     margin-bottom: 12px !important;
-    font-size: 13px !important;
-    line-height: 1.58 !important;
+    font-size: 13.5px !important;
+    line-height: 1.6 !important;
 }
 
-/* 8. 表格样式优化 (柔细框线 + 紧凑清晰) */
+/* 8. 表格样式优化 */
 [data-testid="conversation-view"] table,
 .prose table {
     width: 100% !important;
     border-collapse: separate !important;
     border-spacing: 0 !important;
     border-radius: 10px !important;
-    border: 1px solid rgba(26, 28, 31, 0.09) !important;
+    border: 1px solid rgba(15, 23, 42, 0.09) !important;
     overflow: hidden !important;
     margin-top: 10px !important;
     margin-bottom: 14px !important;
 }
 [data-testid="conversation-view"] th,
 .prose th {
-    background-color: #F9F9F9 !important;
+    background-color: #F9FAFB !important;
     color: #374151 !important;
     font-weight: 500 !important;
-    font-size: 13px !important;
-    padding: 7px 12px !important;
-    border-bottom: 1px solid rgba(26, 28, 31, 0.08) !important;
+    font-size: 13.5px !important;
+    padding: 8px 12px !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
 }
 [data-testid="conversation-view"] td,
 .prose td {
-    padding: 7px 12px !important;
-    font-size: 13px !important;
-    line-height: 1.55 !important;
-    color: #1A1C1F !important;
-    border-bottom: 1px solid rgba(26, 28, 31, 0.05) !important;
+    padding: 8px 12px !important;
+    font-size: 13.5px !important;
+    line-height: 1.58 !important;
+    color: #0D0D0D !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.05) !important;
 }
 
-/* 9. 工具步骤、思考折叠栏与运行状态提示 - 统一收敛为 Codex 12.5px 低调灰字 */
+/* 9. 工具步骤、思考折叠栏与运行状态提示 - 收敛为 Codex 低调清淡灰字 */
 [data-testid="tool-group-collapsible"],
 [data-testid="worked-for-collapsible"],
 [data-testid="thinking-collapsible-trigger"],
@@ -484,8 +503,8 @@ main,
 [data-testid="autoscroll-viewport"] button.tabular-nums span,
 [data-testid="autoscroll-viewport"] button.text-base:has(.text-muted-foreground),
 button:has(> [class*="tabular-nums"]) {
-    opacity: 0.8 !important;
-    font-size: 12.5px !important;
+    opacity: 0.78 !important;
+    font-size: 13px !important;
     line-height: 1.45 !important;
     font-weight: 400 !important;
     min-height: 26px !important;
@@ -494,7 +513,7 @@ button:has(> [class*="tabular-nums"]) {
     padding: 3px 6px !important;
     background-color: transparent !important;
     border-radius: 6px !important;
-    color: #6B7280 !important;
+    color: #71717A !important;
     transition: all 0.15s ease !important;
 }
 [data-testid="tool-group-collapsible"]:hover,
@@ -502,23 +521,22 @@ button:has(> [class*="tabular-nums"]) {
 [data-testid="thinking-collapsible-trigger"]:hover,
 [data-testid="autoscroll-viewport"] button.tabular-nums:hover {
     opacity: 1 !important;
-    background-color: rgba(26, 28, 31, 0.045) !important;
-    color: #1A1C1F !important;
+    background-color: rgba(15, 23, 42, 0.04) !important;
+    color: #0D0D0D !important;
 }
 
-/* 运行中状态提示 ("工作中" 等非正文状态文字) */
 [data-testid="autoscroll-viewport"] .text-muted-foreground:not(p):not(li):not(code):not(pre *) {
-    font-size: 12.5px !important;
+    font-size: 13px !important;
     line-height: 1.5 !important;
 }
 
 [data-testid="run-command-step"] {
-    font-size: 12.5px !important;
+    font-size: 13px !important;
     padding: 2px 6px !important;
-    opacity: 0.82 !important;
+    opacity: 0.8 !important;
 }
 
-/* 10. 底部输入框区域 (Agent Input Box) - 彻底根除双层塑料套娃框，1:1 复刻 Codex 22px 轻盈单层卡片 */
+/* 10. 底部输入框区域 (Agent Input Box) - 复刻 Codex 舒展大气单层 22px 轻盈输入框 */
 [data-testid="agent-input-box"] {
     background-color: transparent !important;
     border: none !important;
@@ -530,17 +548,17 @@ button:has(> [class*="tabular-nums"]) {
 #antigravity\.agentSidePanelInputBox.surface-composer,
 [data-testid="agent-input-box"] .surface-composer {
     background-color: #FFFFFF !important;
-    border: 1px solid rgba(26, 28, 31, 0.11) !important;
+    border: 1px solid rgba(15, 23, 42, 0.09) !important;
     border-radius: 22px !important;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02) !important;
-    padding: 2px !important;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03) !important;
+    padding: 4px 6px !important;
     transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
 #antigravity\.agentSidePanelInputBox.surface-composer:focus-within,
 [data-testid="agent-input-box"] .surface-composer:focus-within {
-    border-color: rgba(26, 28, 31, 0.22) !important;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+    border-color: rgba(15, 23, 42, 0.18) !important;
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.05) !important;
 }
 
 [data-testid="agent-input-box"] .surface-composer-card {
@@ -548,24 +566,24 @@ button:has(> [class*="tabular-nums"]) {
     border: none !important;
     border-radius: 20px !important;
     box-shadow: none !important;
-    padding: 5px 8px 4px !important;
+    padding: 6px 8px 4px !important;
 }
 
+[data-testid="agent-input-box"] [contenteditable="true"],
 [data-testid="agent-input-box"] textarea,
-[data-testid="agent-input-box"] input,
-[data-testid="agent-input-box"] [contenteditable="true"] {
-    font-size: 14px !important;
+[data-testid="agent-input-box"] input {
+    min-height: 44px !important;
+    font-size: 15px !important;
     line-height: 1.55 !important;
-    color: #1A1C1F !important;
+    color: #0D0D0D !important;
     font-weight: 400 !important;
 }
 
-/* 底部区域非气泡与非输入内层卡片保持纯白 */
 [data-testid="conversation-view"] .bg-card:not([data-testid="user-input-step"] *):not(.surface-composer-card) {
     background-color: #FFFFFF !important;
 }
 
-/* 11. 取消上滑对话记录时的提问吸顶遮挡 (Disable Sticky User Input on Scroll) */
+/* 11. 取消上滑对话记录时的提问吸顶遮挡 */
 [data-testid="autoscroll-viewport"] div.sticky.top-0,
 [data-testid="conversation-view"] div.sticky.top-0,
 div.sticky.top-0:has([data-testid="user-input-step"]) {
