@@ -102,7 +102,7 @@ def install():
     print("[4/4] 正在重新封包 app.asar...")
     pack_cmd = f'{npx_cmd} -y @electron/asar pack "{TEMP_DIR}" "{NEW_ASAR}"'
     res = subprocess.run(pack_cmd, shell=True, capture_output=True, text=True)
-    if res.returncode == 0 and os.path.exists(NEW_ASAR) and os.path.getsize(NEW_ASAR) > 15 * 1024 * 1024:
+    if res.returncode == 0 and os.path.exists(NEW_ASAR) and os.path.getsize(NEW_ASAR) > 2 * 1024 * 1024:
         shutil.copy2(NEW_ASAR, asar_path)
         # 清理临时工作目录
         if os.path.exists(NEW_ASAR):
