@@ -9,6 +9,7 @@ const { spawnSync, execSync } = require('child_process');
 
 const SCRIPT_DIR = __dirname;
 const CSS_PATH = path.join(SCRIPT_DIR, 'codex_theme.css');
+const SELF_RAW_BASE = (process.env.CODEX_THEME_RAW_BASE || 'https://raw.githubusercontent.com/qiuyizipi/antigravity-codex-theme/main').replace(/\/+$/, '');
 const CN_REPO_URL = 'https://github.com/Silas-02/antigravity-desktop-cn.git';
 const CN_ZIP_URL = 'https://github.com/Silas-02/antigravity-desktop-cn/archive/refs/heads/main.zip';
 const CN_CACHE_DIR = path.join(SCRIPT_DIR, '.cache', 'antigravity-desktop-cn');
@@ -32,6 +33,8 @@ function parseArgs(argv) {
         mode: 'install', // install | uninstall | check
         withCn: false,
         noKill: false,
+        noUpdate: false,
+        selfUpdated: false,
         brandTitle: 'english',
         manualPath: null,
     };
@@ -41,6 +44,8 @@ function parseArgs(argv) {
         else if (a === '--check' || a === '--status') opts.mode = 'check';
         else if (a === '--with-cn') opts.withCn = true;
         else if (a === '--no-kill') opts.noKill = true;
+        else if (a === '--no-update') opts.noUpdate = true;
+        else if (a === '--self-updated') opts.selfUpdated = true;
         else if (a === '--brand-title' && argv[i + 1]) opts.brandTitle = argv[++i];
         else if ((a === '--asar' || a === '--install-dir') && argv[i + 1]) opts.manualPath = argv[++i];
         else if (!a.startsWith('-') && !opts.manualPath) opts.manualPath = a; // support drag-and-drop onto .bat
@@ -471,6 +476,158 @@ function hasCommand(cmd) {
     return res.status === 0;
 }
 
+// ============================================================================
+// Self-Update Engine (Git fast-forward OR proxy-aware raw HTTP for ZIP users)
+// Fail-open: never blocks installation when offline or GitHub is unreachable
+// ============================================================================
+function downloadTextWithProxy(url, timeoutSec = 12) {
+    const tmpFile = path.join(os.tmpdir(), `codex_upd_${process.pid}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}.tmp`);
+    try {
+        let ok = false;
+        if (process.platform === 'win32') {
+            const psCmd = [
+                '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;',
+                `$ProgressPreference = 'SilentlyContinue';`,
+                `Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${url.replace(/'/g, "''")}' -OutFile '${tmpFile.replace(/'/g, "''")}'`,
+            ].join(' ');
+            const ps = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCmd], {
+                stdio: 'ignore',
+                timeout: (timeoutSec + 6) * 1000,
+            });
+            ok = ps.status === 0 && fs.existsSync(tmpFile);
+        } else {
+            const dl = spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpFile, url], {
+                stdio: 'ignore',
+                timeout: (timeoutSec + 6) * 1000,
+            });
+            ok = dl.status === 0 && fs.existsSync(tmpFile);
+        }
+        if (!ok) return null;
+        return fs.readFileSync(tmpFile, 'utf8');
+    } catch {
+        return null;
+    } finally {
+        if (fs.existsSync(tmpFile)) {
+            try { fs.unlinkSync(tmpFile); } catch {}
+        }
+    }
+}
+
+function normalizeLf(s) {
+    return String(s).replace(/\r\n/g, '\n');
+}
+
+function isValidThemeCss(text) {
+    if (!text || text.length < 1000) return false;
+    if (/^\s*<(!doctype|html)/i.test(text)) return false;
+    return text.includes('--codex-bg') && text.includes('[data-testid="conversation-view"]');
+}
+
+function isValidPatchScript(text) {
+    if (!text || text.length < 3000) return false;
+    if (/^\s*<(!doctype|html)/i.test(text)) return false;
+    if (!text.includes('patchAsarInPlace') || !text.includes('buildInjection')) return false;
+    try {
+        new vm.Script(text);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function reexecUpdatedSelf() {
+    const childArgs = [__filename, '--self-updated', ...process.argv.slice(2).filter(a => a !== '--self-updated')];
+    const res = spawnSync(process.execPath, childArgs, { stdio: 'inherit' });
+    process.exit(res.status === null ? 1 : res.status);
+}
+
+function trySelfUpdate(opts) {
+    if (opts.noUpdate || opts.selfUpdated) return;
+    console.log('[自更新] 正在检查 Codex 主题与安装脚本是否有新版本...');
+
+    // Case 1: Git clone with clean working tree -> fast-forward pull
+    const isGitRepo = fs.existsSync(path.join(SCRIPT_DIR, '.git'));
+    if (isGitRepo && hasCommand('git')) {
+        const st = spawnSync('git', ['-C', SCRIPT_DIR, 'status', '--porcelain'], {
+            encoding: 'utf8',
+            timeout: 5000,
+        });
+        if (st.status === 0 && st.stdout.trim().length > 0) {
+            console.log('[自更新] 检测到本地有未提交改动，跳过自动拉取（保留本地修改）。');
+            return;
+        }
+        const beforeJs = normalizeLf(fs.readFileSync(__filename, 'utf8'));
+        const beforeCss = fs.existsSync(CSS_PATH) ? normalizeLf(fs.readFileSync(CSS_PATH, 'utf8')) : '';
+        const env = { ...process.env };
+        if (!env.HTTPS_PROXY && !env.https_proxy && !env.HTTP_PROXY && !env.http_proxy) {
+            const sysProxy = getWindowsSystemProxyUrl();
+            if (sysProxy) {
+                env.HTTPS_PROXY = sysProxy;
+                env.HTTP_PROXY = sysProxy;
+            }
+        }
+        const pull = spawnSync('git', ['-C', SCRIPT_DIR, 'pull', '--ff-only'], {
+            stdio: 'pipe',
+            encoding: 'utf8',
+            env,
+            timeout: 18000,
+        });
+        if (pull.status === 0) {
+            const afterJs = normalizeLf(fs.readFileSync(__filename, 'utf8'));
+            const afterCss = fs.existsSync(CSS_PATH) ? normalizeLf(fs.readFileSync(CSS_PATH, 'utf8')) : '';
+            if (afterJs !== beforeJs && isValidPatchScript(afterJs)) {
+                console.log('[自更新] 已通过 Git 同步最新版安装引擎，正在无缝切换至新版执行...\n');
+                reexecUpdatedSelf();
+            } else if (afterCss !== beforeCss) {
+                console.log('[自更新] 已通过 Git 同步最新版 codex_theme.css。');
+            } else {
+                console.log('[自更新] 当前主题与脚本已是最新版本。');
+            }
+            return;
+        }
+        console.log('[自更新] Git 拉取未成功，继续尝试使用本地版本（不影响安装）。');
+        return;
+    }
+
+    // Case 2: ZIP download (no .git) -> proxy-aware raw HTTP sync with strict validation
+    const cacheBust = `?t=${Date.now()}`;
+    const remoteCss = downloadTextWithProxy(`${SELF_RAW_BASE}/codex_theme.css${cacheBust}`, 12);
+    const remoteJs = downloadTextWithProxy(`${SELF_RAW_BASE}/patch_theme.js${cacheBust}`, 12);
+
+    if (!remoteCss && !remoteJs) {
+        console.log('[自更新] 无法连接 GitHub（或网络超时），继续使用本地版本完成安装。');
+        return;
+    }
+
+    let cssUpdated = false;
+    let jsUpdated = false;
+
+    if (remoteCss && isValidThemeCss(remoteCss)) {
+        const localCss = fs.existsSync(CSS_PATH) ? normalizeLf(fs.readFileSync(CSS_PATH, 'utf8')) : '';
+        if (normalizeLf(remoteCss) !== localCss) {
+            fs.writeFileSync(CSS_PATH, remoteCss, 'utf8');
+            cssUpdated = true;
+        }
+    }
+
+    if (remoteJs && isValidPatchScript(remoteJs)) {
+        const localJs = normalizeLf(fs.readFileSync(__filename, 'utf8'));
+        if (normalizeLf(remoteJs) !== localJs) {
+            fs.writeFileSync(__filename, remoteJs, 'utf8');
+            jsUpdated = true;
+        }
+    }
+
+    if (jsUpdated) {
+        console.log(`[自更新] 已自动更新安装引擎${cssUpdated ? '与主题样式' : ''}（通过语法校验），正在无缝切换至最新版执行...\n`);
+        reexecUpdatedSelf();
+    } else if (cssUpdated) {
+        console.log('[自更新] 已自动更新最新版 codex_theme.css。');
+    } else {
+        console.log('[自更新] 当前主题与脚本已是最新版本。');
+    }
+}
+
 function downloadCnZipFallback() {
     const zipFile = path.join(SCRIPT_DIR, '.cache', 'antigravity-desktop-cn.zip');
     const extractDir = path.join(SCRIPT_DIR, '.cache', '_extract_cn');
@@ -628,7 +785,8 @@ function printBanner(opts) {
 }
 
 function runInstall(opts) {
-    printBanner(opts);
+    if (!opts.selfUpdated) printBanner(opts);
+    trySelfUpdate(opts);
     if (!fs.existsSync(CSS_PATH)) {
         throw new Error(`未找到主题样式表: ${CSS_PATH}`);
     }

@@ -41,7 +41,11 @@
 - 摒弃会破坏 `app.asar.unpacked` 标记的传统全量解包重封，直接用内置 Node.js 原地修补 `dist/preload.js`。
 - 完整保留官方全部 377+ 个 `unpacked` 原生依赖，不依赖 Python，也不需要联网下载 `@electron/asar`。
 
-5. 一键联动最新中文汉化
+5. 运行时自动更新（下载一次，永久免重复下载）
+- 无论通过 `git clone` 还是网页下载 ZIP，每次双击安装脚本时都会自动联网检查 `qiuyizipi/antigravity-codex-theme` 的最新 `patch_theme.js` 和 `codex_theme.css`（自动兼容 Windows 系统代理，无需 Git）。
+- 若检测到新版脚本，会先通过 `vm.Script` 语法校验再替换，并自动无缝切换至新版继续执行；若处于离线或无法访问 GitHub 状态，自动降级使用本地文件完成安装（也支持加 `--no-update` 跳过联网检查）。
+
+6. 一键联动最新中文汉化
 - 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.0 主题。
 - 客户端升级后只需双击一次即可同时完成“最新中文汉化 + Codex 主题”全套部署。
 
@@ -75,8 +79,8 @@ chmod +x install.sh uninstall.sh
 # 只读检测当前 app.asar 版本、语法及补丁状态
 node patch_theme.js --check
 
-# 联动汉化并叠加主题（可选 --no-kill 不自动关闭客户端）
-node patch_theme.js --with-cn --no-kill
+# 联动汉化并叠加主题（可选 --no-kill 不关闭客户端，--no-update 跳过联网检查）
+node patch_theme.js --with-cn --no-kill --no-update
 
 # 仅安装主题
 node patch_theme.js
