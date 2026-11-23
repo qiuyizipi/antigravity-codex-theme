@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-python3 "$DIR/patch_theme.py"
+node "$DIR/patch_theme.js" "$@"

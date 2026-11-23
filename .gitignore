@@ -1,5 +1,6 @@
+.cache/
 temp_asar_extracted/
 temp_patched.asar
-*.bak
-__pycache__/
+*.tmp*
 .DS_Store
+Thumbs.db

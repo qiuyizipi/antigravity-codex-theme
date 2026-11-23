@@ -1,91 +1,115 @@
-# Antigravity Codex Theme (1:1 像素级复刻 OpenAI Codex 桌面端质感)
+# Antigravity Codex Theme (1:1 复刻 OpenAI Codex 桌面端质感)
 
-> **支持系统**：Windows / macOS / Linux（内置全平台一键部署与双击还原脚本）
+> 支持系统：Windows / macOS / Linux（零依赖纯 Node.js 原地无损封包，内置一键安装与还原脚本）
 >
-> **适用版本**：Antigravity 2.x 全系列（Electron 架构桌面端）
+> 适用版本：Antigravity 2.x 全系列（已专门适配 v2.34.0+ `app.asar.unpacked` 原生依赖拆分架构）
 >
-> **设计目标**：将 Antigravity 官方扁平、发灰、刺眼且横向过度拉伸的界面，**1:1 精准重构为 OpenAI Codex 桌面端**的经典灰白空间层次、深墨纯净字体、无边框数据胶囊与黄金视宽排版。
+> 设计目标：直接对齐本地 OpenAI Codex 桌面端的设计规范，将 Antigravity 界面重构为无缝全屏白底画布、冰白侧边栏、720px 严格对齐阅读柱、15px/1.66 ClearType 深墨字体与单层 22px 精致输入框。
 >
-> **安全承诺**：自动备份官方核心 `app.asar`，一键安装与秒级无损还原，绝不修改核心编译二进制。
+> 安全承诺：纯 Node.js 原地修补 Chromium Pickle ASAR 索引，完整保留全部 `unpacked` 原生二进制依赖，写入前执行 `vm.Script` 语法校验，并自动备份支持秒级无损还原。
 
 ---
 
-## 📸 效果展示 (Before & After)
+## 效果展示
 
 ![Codex 桌面端 1:1 质感实机截图](./showimg/preview.png)
 
 ---
 
-## ✨ 核心解决痛点与重构特色
+## 核心特性（v4.0 Full-Screen Mirror）
 
-### 1. 经典冷暖双区层次（告别整屏惨白与刺眼）
-* **侧边栏与菜单顶栏**：全面重构为 Codex 标志性的浅雅冰灰蓝（`#F2F5F7`），并在右侧注入细致的浅灰空间分界线（`#E5E7EB`）。
-* **会话列表胶囊**：当前选中会话采用 Codex 同款柔灰微圆角卡片（`#E2E8F0`），低反差、护眼、聚焦。
+1. 全屏无缝白底画布与 720px 严格对齐
+- 移除对话区外圈 8px 留白与 12px 卡片圆角，还原 Codex 桌面端的通透白底画布。
+- 主对话流与底部输入框严格对齐至 `720px` 黄金阅读视宽，消除左右错位。
+- 底部输入框重构为单层 22px 圆角、96px 高度与极细浅灰边框。
 
-### 2. 深墨字色与 Windows 次像素 ClearType 渲染（告别发灰模糊）
-* **纯正深墨黑字**：正文字色从原版发灰泛蓝的 `#1e293b` 全面替换为 Codex 官方深墨色 `#0d0d0d`。反差充沛，汉字笔画清晰扎实。
-* **原生次像素平滑**：保留 Windows 系统的 ClearType 次像素渲染机制，消除了原版强制灰度抗锯齿导致的字体笔画发细、发毛等疲劳感。
-* **黄金排版比例**：对齐 Codex 桌面端基准，正文采用 `15px` 字号配合 `25px` 行高（1.68x），字距紧凑精致。
+2. 深墨字体与 Windows ClearType 次像素渲染
+- 正文统一采用 `15px / 1.66` 行高、400 标准字重、`#0D0D0D` 深墨色。
+- 开启 `subpixel-antialiased` 次像素渲染，告别原版发灰、笔画发虚的视觉疲劳。
+- 取消上滑历史记录时的用户提问吸顶遮挡，让长对话回溯视野彻底通透。
 
-### 3. 无边框行内数据微胶囊（Token Badges）
-* **去硬框化**：消除了原版带有粗糙 `1px` 灰框的代码标签，改用 Codex 原汁原味的浅灰圆角底色（`rgba(0, 0, 0, 0.05)`）。
-* **视觉节奏**：数字、参数、指标自然内嵌在文本流中，形成醒目却温润的视觉锚点。
+3. 冰白净化侧边栏
+- 侧边栏采用 `#F7FAFA` 冰白背景、纯色吸顶分组标题与 3.5px 极细滚动条。
+- 会话时间戳默认隐藏，鼠标悬停时平滑显示，界面干净克制。
 
-### 4. 720px 黄金阅读视宽约束（告别横向大漠与简陋感）
-* 将中心阅读柱严格约束在 `720px` 黄金视宽（单行容纳约 38 个汉字）。
-* 消除原本在 1080p/2K/4K 屏幕上横跨一整屏的稀疏草稿感，阅读目光跳行轻松自然。
+4. 零依赖原地无损 ASAR 引擎（支持 v2.34.0+）
+- 摒弃会破坏 `app.asar.unpacked` 标记的传统全量解包重封，直接用内置 Node.js 原地修补 `dist/preload.js`。
+- 完整保留官方全部 377+ 个 `unpacked` 原生依赖，不依赖 Python，也不需要联网下载 `@electron/asar`。
 
-### 5. 取消上滑历史记录时的提问吸顶遮挡
-* 原版在向上回看历史对话时，会将上一条用户提问强制吸顶悬浮并带有下向黑色遮罩，挡住历史内容。
-* 本补丁将提问框重构为自然流式排版（`position: static`），跟随滚动自然划走，视野彻底通透。
+5. 一键联动最新中文汉化
+- 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.0 主题。
+- 客户端升级后只需双击一次即可同时完成“最新中文汉化 + Codex 主题”全套部署。
 
 ---
 
-## 🚀 极速安装与使用指南
+## 快速安装指南
+
+环境要求：已安装 Node.js（推荐 Node 18+；如需一键联动汉化，需本机有 Git）。
 
 ### Windows 用户（推荐）
 1. 下载或克隆本仓库到本地。
-2. 退出正在运行的 Antigravity 软件。
-3. 双击运行 **`双击安装Codex主题.bat`**。
-4. 提示 `[√] 成功！` 后，重新打开 Antigravity 即可。
+2. 完全退出 Antigravity（包含系统托盘图标）。
+3. 按需选择以下脚本双击运行：
+   - 仅安装 Codex 主题：双击 `双击安装Codex主题.bat`
+   - 一键同步最新中文汉化 + 安装 Codex 主题：双击 `双击一键汉化并安装Codex主题.bat`
+4. 提示 `[√] 成功` 后，重新打开 Antigravity 即可。
 
 ### macOS / Linux 用户
-打开终端，进入本仓库目录运行：
 ```bash
 chmod +x install.sh uninstall.sh
+
+# 仅安装 Codex 主题
 ./install.sh
+
+# 一键联动最新中文汉化 + Codex 主题
+./install.sh --with-cn
+```
+
+### 常用命令行参数
+```bash
+# 只读检测当前 app.asar 版本、语法及补丁状态
+node patch_theme.js --check
+
+# 联动汉化并叠加主题（可选 --no-kill 不自动关闭客户端）
+node patch_theme.js --with-cn --no-kill
+
+# 仅安装主题
+node patch_theme.js
+
+# 恢复原版主题
+node patch_theme.js --uninstall
 ```
 
 ---
 
-## 🔄 卸载与恢复官方原版
+## 卸载与还原
 
-如果你需要恢复官方原版样式：
-* **Windows**：双击运行 **`双击恢复原版主题.bat`** 即可瞬间还原。
-* **macOS / Linux**：终端运行 `./uninstall.sh`。
+- Windows：双击 `双击恢复原版主题.bat`
+- macOS / Linux：终端运行 `./uninstall.sh`
+
+脚本会优先从 `app.asar.before_codex_patch.bak` 无损还原；若备份不存在，也会原地干净剥离 Codex 主题代码块，不会损坏原有程序或汉化内容。
 
 ---
 
-## 📂 项目文件结构
+## 项目文件结构
 
-```
+```text
 antigravity-codex-theme/
-├── 双击安装Codex主题.bat    # Windows 双击一键安装入口
-├── 双击恢复原版主题.bat    # Windows 双击一键卸载还原入口
-├── install.sh             # macOS / Linux 终端安装脚本
-├── uninstall.sh           # macOS / Linux 终端还原脚本
-├── patch_theme.py         # 跨平台解包注入与安全封装引擎
-├── codex_theme.css        # 1:1 Codex 像素级重构样式表
-├── showimg/               # 效果展示截图
-│   └── preview.png
-├── LICENSE                # MIT 开源协议
-└── README.md              # 项目中文说明文档
+├── 双击一键汉化并安装Codex主题.bat  # Windows 一键联动汉化 + Codex 主题
+├── 双击安装Codex主题.bat            # Windows 双击仅安装 Codex 主题
+├── 双击恢复原版主题.bat             # Windows 双击一键还原
+├── install.sh                       # macOS / Linux 安装入口（支持 --with-cn）
+├── uninstall.sh                     # macOS / Linux 还原入口
+├── patch_theme.js                   # 零依赖 Node.js 原地无损 ASAR 注入与校验引擎
+├── codex_theme.css                  # v4.0 全屏镜像 Codex 样式表
+├── showimg/preview.png              # 实机效果截图
+├── LICENSE                          # MIT 开源协议
+└── README.md                        # 说明文档
 ```
 
 ---
 
-## 🛠️ 技术原理与安全保障
+## 致谢与声明
 
-1. **零二进制入侵**：不修改任何底层二进制执行文件，仅通过标准工具 `@electron/asar` 解包 `app.asar`。
-2. **Preload 样式注入**：在 Electron 的前端加载生命周期入口 `preload.js` 中安全挂载样式，与业务逻辑完全解耦。
-3. **独立备份容灾**：首次运行自动将官方原版备份为 `app.asar.before_codex_patch.bak`，随时可以 100% 无损复原。
+- 中文汉化能力通过一键脚本在线联动 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 实现，本仓库不直接分发第三方汉化源码，版权归原作者所有。
+- 本仓库内的 Codex 视觉主题样式表（`codex_theme.css`）与原地无损 ASAR 注入引擎（`patch_theme.js`）采用 MIT 协议开源。
