@@ -1,21 +1,35 @@
 @echo off
 chcp 65001 >nul
-title Antigravity 一键中文汉化 + Codex 主题安装器
-echo ========================================================
-echo   Antigravity 一键联动最新中文汉化 + Codex v4.0 主题
-echo ========================================================
-echo  说明：自动拉取 Silas-02/antigravity-desktop-cn 最新汉化
-echo        随后使用无损原地封包引擎叠加注入 Codex 视觉主题
-echo ========================================================
-echo.
+title Antigravity CN + Codex Theme Installer
 
+set "NODE_CMD=node"
 where node >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Node.js，请先安装 Node.js ^(https://nodejs.org/^)
-    pause
-    exit /b 1
+if %errorlevel%==0 goto NODE_READY
+
+if exist "C:\Program Files\nodejs\node.exe" (
+    set "NODE_CMD=C:\Program Files\nodejs\node.exe"
+    set "PATH=C:\Program Files\nodejs;%PATH%"
+    goto NODE_READY
+)
+if exist "C:\Program Files (x86)\nodejs\node.exe" (
+    set "NODE_CMD=C:\Program Files (x86)\nodejs\node.exe"
+    set "PATH=C:\Program Files (x86)\nodejs;%PATH%"
+    goto NODE_READY
+)
+if exist "%LOCALAPPDATA%\Programs\node\node.exe" (
+    set "NODE_CMD=%LOCALAPPDATA%\Programs\node\node.exe"
+    set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
+    goto NODE_READY
 )
 
-node "%~dp0patch_theme.js" --with-cn %*
+echo.
+echo [ERROR] Node.js not found. Please install Node.js LTS from:
+echo   https://nodejs.org/
+echo.
+pause
+exit /b 1
+
+:NODE_READY
+"%NODE_CMD%" "%~dp0patch_theme.js" --with-cn %*
 echo.
 pause

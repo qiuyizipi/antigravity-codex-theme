@@ -44,15 +44,15 @@
 
 ## 快速安装指南
 
-环境要求：已安装 Node.js（推荐 Node 18+；如需一键联动汉化，需本机有 Git）。
+环境要求：已安装 Node.js（推荐 Node 18+）。无需安装 Python，也不强制要求安装 Git（未装 Git 时自动改用 ZIP 下载并自动兼容 Windows 系统代理）。
 
 ### Windows 用户（推荐）
 1. 下载或克隆本仓库到本地。
-2. 完全退出 Antigravity（包含系统托盘图标）。
-3. 按需选择以下脚本双击运行：
+2. 按需选择以下脚本双击运行（脚本会自动识别常见安装路径并关闭残留客户端进程）：
    - 仅安装 Codex 主题：双击 `双击安装Codex主题.bat`
    - 一键同步最新中文汉化 + 安装 Codex 主题：双击 `双击一键汉化并安装Codex主题.bat`
-4. 提示 `[√] 成功` 后，重新打开 Antigravity 即可。
+   - 若安装在非默认目录未能自动识别：直接将 Antigravity 安装目录或 `Antigravity.exe` 拖拽到 `.bat` 脚本图标上即可；若装在 `C:\Program Files`，请右键「以管理员身份运行」。
+3. 提示 `[OK] 成功` 后，重新打开 Antigravity 即可。
 
 ### macOS / Linux 用户
 ```bash
