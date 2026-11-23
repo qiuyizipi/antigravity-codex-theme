@@ -1,151 +1,274 @@
 /* ==========================================================================
-   Antigravity 1:1 Codex Mirror Aesthetic Theme (v4.4 True-Scale Edition)
-   1:1 对齐 OpenAI Codex 桌面端实机观感：
-   - 饱满清晰字号：正文 15.5px / 1.68、左侧边栏 14px、输入框与气泡 15px，标准 Microsoft YaHei（告别窄体发糊）
-   - 原厂色彩层次：顶栏、右上角窗口按钮与左边栏统一清雅冷灰 #F4F6F7，主画布纯白 #FFFFFF，正文柔和炭黑 #1A1C1F
-   - 720px 严格上下齐边：正文与底部输入框 100% 左右对齐
-   - 完整双色模式：浅色 / 深色 / 跟随系统实时无缝切换 + 原生顶栏按钮同步
+   Antigravity 1:1 Codex Mirror Aesthetic Theme (v4.6 Pixel-Parity Edition)
+   逐像素对齐 OpenAI Codex 桌面端实机观感：
+   - 16px / 1.66 饱满正文 + 14px 左侧边栏（对齐 Codex 实测 8px/7px 缩略字高）
+   - 灰度平滑抗锯齿（消除 Windows ClearType 7.8 彩边发毛，还原 Codex 1.7 柔和圆润笔画）
+   - 768px 容器（扣内边距后净文字宽 ~725px，1:1 对齐 Codex 728px 阅读列宽）
+   - 清亮 #F8F9FC 侧边栏与顶栏 + 柔和炭黑 #1F2328 正文 / #374151 侧栏字，告别死黑扎眼与发白发虚
+   - 完整支持浅色 / 深色 (含 html:has(> body.dark)) / 跟随系统实时无缝切换
    ========================================================================== */
 
-/* 1A. 浅色模式配色令牌 (Codex Light Exact Tokens) */
+/* 0. 零外部依赖中文字重桥接：彻底封死 Windows DirectWrite 向下误落 Microsoft YaHei Light (300) */
+@font-face {
+    font-family: "CodexYaHei";
+    src: local("Microsoft YaHei"), local("MicrosoftYaHei"), local("微软雅黑"), local("PingFang SC");
+    font-weight: 100 599;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "CodexYaHei";
+    src: local("Microsoft YaHei Bold"), local("MicrosoftYaHei-Bold"), local("微软雅黑 Bold"), local("PingFang SC Semibold"), local("Microsoft YaHei");
+    font-weight: 600 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* 1A. 浅色模式全量设计令牌 (Codex Light Solid-Ink Pixel-Parity Tokens) */
 :root,
 html.light,
 html.theme-light,
 html[data-theme="light"],
 html[data-color-scheme="light"],
-html[data-codex-mode="light"] {
+html[data-codex-mode="light"],
+html:not(.dark):not([data-codex-mode="dark"]):not(:has(> body.dark)) body:not(.dark) {
     --codex-bg: #FFFFFF;
-    --codex-sidebar: #F4F6F7;
-    --codex-sidebar-secondary: #E6E9EC;
-    --codex-sidebar-active: rgba(15, 23, 42, 0.068);
-    --codex-sidebar-hover: rgba(15, 23, 42, 0.038);
-    --codex-sidebar-nav-hover: rgba(15, 23, 42, 0.045);
+    --codex-sidebar: #F8F9FC;
+    --codex-sidebar-secondary: #ECEFF4;
+    --codex-sidebar-active: rgba(15, 23, 42, 0.072);
+    --codex-sidebar-hover: rgba(15, 23, 42, 0.042);
+    --codex-sidebar-nav-hover: rgba(15, 23, 42, 0.052);
     --codex-titlebar-bg: none;
-    --codex-titlebar-solid: #F4F6F7;
-    --codex-titlebar-fg: #374151;
-    --codex-text: #1A1C1F;
-    --codex-text-row: #2B2E33;
-    --codex-text-secondary: #4B5563;
-    --codex-text-muted: #737373;
-    --codex-text-subtle: #737373;
-    --codex-text-faint: #9CA3AF;
-    --codex-marker: #6B7280;
+    --codex-titlebar-solid: #F8F9FC;
+    --codex-titlebar-fg: #1F2328;
+    --codex-text: #1B1F24;
+    --codex-text-strong: #000000;
+    --codex-text-row: #24292F;
+    --codex-text-secondary: #374151;
+    --codex-text-muted: #525866;
+    --codex-text-subtle: #525866;
+    --codex-text-faint: #767E8C;
+    --codex-marker: #4B5563;
     --codex-border-subtle: rgba(15, 23, 42, 0.065);
-    --codex-border: rgba(15, 23, 42, 0.075);
-    --codex-border-strong: rgba(15, 23, 42, 0.16);
-    --codex-border-table: rgba(15, 23, 42, 0.085);
-    --codex-border-row: rgba(15, 23, 42, 0.05);
-    --codex-bubble-bg: #EBF2FA;
-    --codex-bubble-fg: #142B47;
+    --codex-border: rgba(15, 23, 42, 0.085);
+    --codex-border-strong: rgba(15, 23, 42, 0.18);
+    --codex-border-table: rgba(15, 23, 42, 0.09);
+    --codex-border-row: rgba(15, 23, 42, 0.055);
+    --codex-bubble-bg: #EBF3FC;
+    --codex-bubble-fg: #0D2540;
     --codex-float-bg: rgba(255, 255, 255, 0.96);
     --codex-float-shadow: 0 1px 4px rgba(0, 0, 0, 0.045);
-    --codex-quote-bg: #FAFAFA;
-    --codex-code-inline-bg: rgba(15, 23, 42, 0.05);
+    --codex-quote-bg: #F9FAFB;
+    --codex-code-inline-bg: rgba(15, 23, 42, 0.048);
     --codex-code-block-bg: #F8F9FA;
     --codex-table-head-bg: #F8F9FA;
     --codex-composer-bg: #FFFFFF;
-    --codex-composer-border: rgba(15, 23, 42, 0.075);
-    --codex-composer-focus-border: rgba(15, 23, 42, 0.15);
-    --codex-composer-shadow: 0 1px 4px rgba(0, 0, 0, 0.024);
-    --codex-composer-focus-shadow: 0 3px 12px rgba(0, 0, 0, 0.045);
-    --codex-scroll-thumb: rgba(15, 23, 42, 0.13);
-    --codex-scroll-thumb-hover: rgba(15, 23, 42, 0.26);
-    --codex-font-smoothing: auto;
+    --codex-composer-border: rgba(15, 23, 42, 0.09);
+    --codex-composer-focus-border: rgba(15, 23, 42, 0.18);
+    --codex-composer-shadow: 0 2px 10px rgba(0, 0, 0, 0.032), 0 1px 2px rgba(0, 0, 0, 0.02);
+    --codex-composer-focus-shadow: 0 4px 16px rgba(0, 0, 0, 0.052), 0 1px 3px rgba(0, 0, 0, 0.028);
+    --codex-scroll-thumb: rgba(15, 23, 42, 0.15);
+    --codex-scroll-thumb-hover: rgba(15, 23, 42, 0.28);
+    --codex-font-smoothing: subpixel-antialiased;
+
+    /* Windows Electron 浅色模式两档实墨补偿：正文扎实清晰，加粗强调更黑更醒目 */
+    --codex-ink-prose: 0 0 0.40px color-mix(in srgb, currentColor 50%, transparent);
+    --codex-ink-bold: 0 0 0.55px color-mix(in srgb, currentColor 70%, transparent);
+    --codex-ink-ui: 0 0 0.35px color-mix(in srgb, currentColor 45%, transparent);
+
+    /* 同步覆盖 Antigravity 原生语义前景色，根除全界面发白发灰 */
+    --foreground: #1B1F24 !important;
+    --secondary-foreground: #24292F !important;
+    --muted-foreground: #525866 !important;
+    --code-foreground: #1B1F24 !important;
+    --content: #FFFFFF !important;
+    --shell: #F8F9FC !important;
+    --card: #FFFFFF !important;
+    --card-border: rgba(15, 23, 42, 0.085) !important;
+    --border: rgba(15, 23, 42, 0.085) !important;
+    --sidebar-border: rgba(15, 23, 42, 0.065) !important;
+    --sidebar-secondary: #ECEFF4 !important;
+    --onyx-frame: #F2F4F8 !important;
+    --onyx-well: #F8F9FC !important;
+    --onyx-raised: #FFFFFF !important;
+    --onyx-selected: #ECEFF4 !important;
+    --glass: #FFFFFF !important;
+    --glass-border: rgba(15, 23, 42, 0.085) !important;
 }
 
-/* 1B. 深色模式配色令牌 (Codex Dark Exact Tokens) */
+/* 1B. 深色模式全量设计令牌 (Codex Dark Exact Tokens，完整兼容 html.dark 与 body.dark) */
 html.dark,
 html.theme-dark,
 html.vscode-dark,
 html[data-theme="dark"],
 html[data-color-scheme="dark"],
 html[data-codex-mode="dark"],
+html:has(> body.dark),
 body.dark,
-body.theme-dark {
+body.theme-dark,
+body[data-agy-theme].dark {
     --codex-bg: #212121;
     --codex-sidebar: #181818;
-    --codex-sidebar-secondary: #262626;
-    --codex-sidebar-active: rgba(255, 255, 255, 0.10);
-    --codex-sidebar-hover: rgba(255, 255, 255, 0.06);
-    --codex-sidebar-nav-hover: rgba(255, 255, 255, 0.07);
+    --codex-sidebar-secondary: #2A2A2A;
+    --codex-sidebar-active: rgba(255, 255, 255, 0.11);
+    --codex-sidebar-hover: rgba(255, 255, 255, 0.065);
+    --codex-sidebar-nav-hover: rgba(255, 255, 255, 0.075);
     --codex-titlebar-bg: none;
     --codex-titlebar-solid: #181818;
-    --codex-titlebar-fg: #E5E7EB;
-    --codex-text: #ECECEC;
-    --codex-text-row: #E5E5E5;
-    --codex-text-secondary: #CDCDCD;
-    --codex-text-muted: #9B9B9B;
+    --codex-titlebar-fg: #ECECEC;
+    --codex-text: #E6E6E6;
+    --codex-text-strong: #FFFFFF;
+    --codex-text-row: #E0E0E0;
+    --codex-text-secondary: #D4D4D4;
+    --codex-text-muted: #A1A1AA;
     --codex-text-subtle: #A1A1AA;
-    --codex-text-faint: #71717A;
+    --codex-text-faint: #787880;
     --codex-marker: #9CA3AF;
-    --codex-border-subtle: rgba(255, 255, 255, 0.07);
+    --codex-border-subtle: rgba(255, 255, 255, 0.075);
     --codex-border: rgba(255, 255, 255, 0.10);
     --codex-border-strong: rgba(255, 255, 255, 0.22);
     --codex-border-table: rgba(255, 255, 255, 0.12);
-    --codex-border-row: rgba(255, 255, 255, 0.06);
+    --codex-border-row: rgba(255, 255, 255, 0.065);
     --codex-bubble-bg: #2B3544;
-    --codex-bubble-fg: #F3F4F6;
+    --codex-bubble-fg: #F5F7FA;
     --codex-float-bg: rgba(36, 36, 36, 0.96);
     --codex-float-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
     --codex-quote-bg: #262626;
-    --codex-code-inline-bg: rgba(255, 255, 255, 0.10);
+    --codex-code-inline-bg: rgba(255, 255, 255, 0.11);
     --codex-code-block-bg: #171717;
     --codex-table-head-bg: #262626;
-    --codex-composer-bg: #2A2A2A;
+    --codex-composer-bg: #2B2B2B;
     --codex-composer-border: rgba(255, 255, 255, 0.11);
     --codex-composer-focus-border: rgba(255, 255, 255, 0.24);
-    --codex-composer-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-    --codex-composer-focus-shadow: 0 4px 18px rgba(0, 0, 0, 0.40);
-    --codex-scroll-thumb: rgba(255, 255, 255, 0.16);
-    --codex-scroll-thumb-hover: rgba(255, 255, 255, 0.32);
+    --codex-composer-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+    --codex-composer-focus-shadow: 0 4px 18px rgba(0, 0, 0, 0.42);
+    --codex-scroll-thumb: rgba(255, 255, 255, 0.18);
+    --codex-scroll-thumb-hover: rgba(255, 255, 255, 0.34);
     --codex-font-smoothing: antialiased;
+    --codex-ink-prose: none;
+    --codex-ink-bold: none;
+    --codex-ink-ui: none;
+
+    --foreground: #F2F2F2 !important;
+    --secondary-foreground: #DEDEDE !important;
+    --muted-foreground: #A1A1AA !important;
+    --code-foreground: #F2F2F2 !important;
+    --content: #212121 !important;
+    --shell: #181818 !important;
+    --card: #262626 !important;
+    --card-border: rgba(255, 255, 255, 0.10) !important;
+    --border: rgba(255, 255, 255, 0.10) !important;
+    --sidebar-border: rgba(255, 255, 255, 0.08) !important;
+    --sidebar-secondary: #2A2A2A !important;
+    --onyx-frame: #282828 !important;
+    --onyx-well: #212121 !important;
+    --onyx-raised: #303030 !important;
+    --onyx-selected: #353535 !important;
+    --glass: #282828 !important;
+    --glass-border: rgba(255, 255, 255, 0.10) !important;
 }
 
-/* 跟随系统深色模式兜底（仅当客户端未显式标记浅色时生效） */
+/* 跟随系统深色模式兜底 */
 @media (prefers-color-scheme: dark) {
-    :root:not(.light):not(.theme-light):not([data-theme="light"]):not([data-color-scheme="light"]):not([data-codex-mode="light"]) {
+    :root:not(.light):not(.theme-light):not([data-theme="light"]):not([data-color-scheme="light"]):not([data-codex-mode="light"]):not(:has(> body.light)) {
         --codex-bg: #212121;
         --codex-sidebar: #181818;
-        --codex-sidebar-secondary: #262626;
-        --codex-sidebar-active: rgba(255, 255, 255, 0.10);
-        --codex-sidebar-hover: rgba(255, 255, 255, 0.06);
-        --codex-sidebar-nav-hover: rgba(255, 255, 255, 0.07);
+        --codex-sidebar-secondary: #2A2A2A;
+        --codex-sidebar-active: rgba(255, 255, 255, 0.11);
+        --codex-sidebar-hover: rgba(255, 255, 255, 0.065);
+        --codex-sidebar-nav-hover: rgba(255, 255, 255, 0.075);
         --codex-titlebar-bg: none;
         --codex-titlebar-solid: #181818;
-        --codex-titlebar-fg: #E5E7EB;
-        --codex-text: #ECECEC;
-        --codex-text-row: #E5E5E5;
-        --codex-text-secondary: #CDCDCD;
-        --codex-text-muted: #9B9B9B;
+        --codex-titlebar-fg: #ECECEC;
+        --codex-text: #E6E6E6;
+        --codex-text-strong: #FFFFFF;
+        --codex-text-row: #E0E0E0;
+        --codex-text-secondary: #D4D4D4;
+        --codex-text-muted: #A1A1AA;
         --codex-text-subtle: #A1A1AA;
-        --codex-text-faint: #71717A;
+        --codex-text-faint: #787880;
         --codex-marker: #9CA3AF;
-        --codex-border-subtle: rgba(255, 255, 255, 0.07);
+        --codex-border-subtle: rgba(255, 255, 255, 0.075);
         --codex-border: rgba(255, 255, 255, 0.10);
         --codex-border-strong: rgba(255, 255, 255, 0.22);
         --codex-border-table: rgba(255, 255, 255, 0.12);
-        --codex-border-row: rgba(255, 255, 255, 0.06);
+        --codex-border-row: rgba(255, 255, 255, 0.065);
         --codex-bubble-bg: #2B3544;
-        --codex-bubble-fg: #F3F4F6;
+        --codex-bubble-fg: #F5F7FA;
         --codex-float-bg: rgba(36, 36, 36, 0.96);
         --codex-float-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
         --codex-quote-bg: #262626;
-        --codex-code-inline-bg: rgba(255, 255, 255, 0.10);
+        --codex-code-inline-bg: rgba(255, 255, 255, 0.11);
         --codex-code-block-bg: #171717;
         --codex-table-head-bg: #262626;
-        --codex-composer-bg: #2A2A2A;
+        --codex-composer-bg: #2B2B2B;
         --codex-composer-border: rgba(255, 255, 255, 0.11);
         --codex-composer-focus-border: rgba(255, 255, 255, 0.24);
-        --codex-composer-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-        --codex-composer-focus-shadow: 0 4px 18px rgba(0, 0, 0, 0.40);
-        --codex-scroll-thumb: rgba(255, 255, 255, 0.16);
-        --codex-scroll-thumb-hover: rgba(255, 255, 255, 0.32);
+        --codex-composer-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+        --codex-composer-focus-shadow: 0 4px 18px rgba(0, 0, 0, 0.42);
+        --codex-scroll-thumb: rgba(255, 255, 255, 0.18);
+        --codex-scroll-thumb-hover: rgba(255, 255, 255, 0.34);
         --codex-font-smoothing: antialiased;
+        --codex-ink-prose: none;
+        --codex-ink-bold: none;
+        --codex-ink-ui: none;
+
+        --foreground: #F2F2F2 !important;
+        --secondary-foreground: #DEDEDE !important;
+        --muted-foreground: #A1A1AA !important;
+        --code-foreground: #F2F2F2 !important;
+        --content: #212121 !important;
+        --shell: #181818 !important;
+        --card: #262626 !important;
+        --card-border: rgba(255, 255, 255, 0.10) !important;
+        --border: rgba(255, 255, 255, 0.10) !important;
+        --sidebar-border: rgba(255, 255, 255, 0.08) !important;
+        --sidebar-secondary: #2A2A2A !important;
     }
 }
 
-/* 1C. 全局设计令牌映射与 Codex 原厂清秀字体栈 */
-:root, html, body {
+/* 1C. 全局字体与字重变量强力接管（彻底击碎 Google Sans Flex 350 瘦弱字重与 wdth:92 窄轴继承） */
+:root,
+html,
+body,
+body[data-agy-theme],
+body[data-agy-theme] :where(.font-sans),
+body[data-agy-font],
+body[data-agy-font="google-sans"],
+body[data-agy-font="inter"],
+body:not([data-agy-font="inter"]),
+body:not([data-agy-font="inter"]) :where(.font-sans),
+body[data-agy-font] :where(.font-sans),
+body[data-agy-theme] :where(.font-mono),
+body[data-agy-font] :where(.font-mono) {
+    --font-sans: "Segoe UI", "CodexYaHei", "Microsoft YaHei", "Microsoft YaHei UI", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif !important;
+    --font-family: var(--font-sans) !important;
+    --sdk-font-family: var(--font-sans) !important;
+    --default-font-family: var(--font-sans) !important;
+    --vscode-font-family: var(--font-sans) !important;
+    --font-mono: "Cascadia Mono", "SF Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "CodexYaHei", "Microsoft YaHei", monospace !important;
+    --editor-font-family: var(--font-mono) !important;
+    --default-mono-font-family: var(--font-mono) !important;
+
+    --font-weight-light: 400 !important;
+    --font-weight-normal: 400 !important;
+    --font-weight-medium: 500 !important;
+    --font-weight-semibold: 600 !important;
+    --font-weight-bold: 700 !important;
+    --agy-gsf-h1-wght: 600 !important;
+    --agy-gsf-h3-wght: 600 !important;
+    --agy-gsf-bold-wght: 600 !important;
+    --agy-gsf-wdth: 100 !important;
+    --agy-gsf-rond: 0 !important;
+    --agy-gsf-slnt: 0 !important;
+}
+
+:root,
+html,
+body,
+body[data-agy-font],
+body[data-agy-font="google-sans"],
+body:not([data-agy-font="inter"]) {
     --color-background: var(--codex-bg) !important;
     --sidebar: var(--codex-sidebar) !important;
     --color-sidebar: var(--codex-sidebar) !important;
@@ -154,29 +277,41 @@ body.theme-dark {
     --vscode-sideBar-background: var(--codex-sidebar) !important;
     --vscode-titleBar-activeBackground: var(--codex-titlebar-solid) !important;
 
-    /* 统一 720px 黄金列宽，由原生容器同步约束正文与底部输入框 100% 齐边 */
-    --max-conversation-width: 720px !important;
+    --max-conversation-width: 768px !important;
 
-    /* Windows 原生清晰字体栈（标准 Microsoft YaHei，告别压窄的 YaHei UI 与发虚的 optimizeLegibility） */
-    font-family: "Segoe UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif !important;
+    font-family: var(--font-sans) !important;
+    font-weight: 400 !important;
+    font-variation-settings: normal !important;
     -webkit-font-smoothing: var(--codex-font-smoothing) !important;
     text-rendering: auto !important;
-    font-weight: 400 !important;
     color: var(--codex-text) !important;
 }
 
-/* 2. 顶部窗体菜单栏 - 与左侧边栏统一清雅冷灰底色 */
+/* 彻底清除正文、Markdown 及 UI 子元素的可变字体 350 细字重污染 */
+body :where(.font-sans, .font-light, .font-normal, p, li, span, div, button, a, h1, h2, h3, h4, h5, h6, strong, b, td, th),
+[data-markdown-root],
+[data-markdown-root] :where(p, li, span, div, h1, h2, h3, h4, h5, h6, strong, b, blockquote) {
+    font-variation-settings: normal !important;
+}
+
+:where(.font-light, .font-normal):not(strong):not(b) {
+    font-weight: 400 !important;
+}
+
+/* 2. 顶部窗体菜单栏 - 与左侧边栏统一清亮冷白底色 */
 [data-testid="title-menu-bar"] {
     background-color: var(--codex-titlebar-solid) !important;
     background-image: var(--codex-titlebar-bg) !important;
     border-bottom: none !important;
     font-size: 13px !important;
+    font-weight: 400 !important;
     color: var(--codex-titlebar-fg) !important;
+    text-shadow: var(--codex-ink-ui) !important;
 }
 
-/* 3. 左侧边栏 (Left Sidebar) - Codex 清雅灰白层次与透气行距 */
+/* 3. 左侧边栏 (Left Sidebar) - Codex 清晰扎实字形与清雅灰白层次 */
 aside,
-.bg-sidebar,
+.bg-sidebar:not([data-has-browser-hole="true"]),
 [data-testid="conversation-list-sidebar"],
 [class*="sidebar"]:not([data-testid="toggle-aux-sidebar"]) {
     background-color: var(--codex-sidebar) !important;
@@ -188,7 +323,6 @@ aside {
     background-color: var(--codex-sidebar) !important;
 }
 
-/* 侧边栏吸顶分组头 */
 [data-testid="conversation-list-sidebar"] [style*="sticky"],
 [data-testid="conversation-list-sidebar"] .sticky {
     background-color: var(--codex-sidebar) !important;
@@ -197,30 +331,36 @@ aside {
     box-shadow: 0 2px 4px -2px var(--codex-sidebar) !important;
 }
 
-/* 会话列表行：14px 清晰舒展字体 + 33px 轻盈行高（对齐 Codex 左栏实际大小） */
+/* 会话列表行：14px 实墨清晰字 + 30px 轻盈行高 */
 [data-testid="conversation-row-sidebar"] {
-    min-height: 33px !important;
-    padding: 5px 10px !important;
+    min-height: 30px !important;
+    padding: 4px 10px !important;
     border-radius: 8px !important;
-    margin-bottom: 2px !important;
+    margin-bottom: 1.5px !important;
     transition: background-color 0.12s ease !important;
 }
 
 [data-testid="conversation-row-sidebar"] span.truncate,
 [data-testid="conversation-row-sidebar"] .truncate {
+    font-family: var(--font-sans) !important;
     font-size: 14px !important;
-    line-height: 21px !important;
+    line-height: 20px !important;
     font-weight: 400 !important;
-    letter-spacing: 0px !important;
     color: var(--codex-text-row) !important;
+    text-shadow: var(--codex-ink-ui) !important;
 }
 
-/* 激活选中项与悬停态 */
-[data-testid="conversation-row-sidebar"].bg-sidebar-secondary {
+/* 激活选中项（兼容 2.33+ data-selected="true"、.agy-sidebar-row 与 bg-sidebar-secondary） */
+[data-testid="conversation-row-sidebar"].bg-sidebar-secondary,
+[data-testid="conversation-row-sidebar"][data-selected="true"],
+.agy-sidebar-row[data-selected="true"] {
     background-color: var(--codex-sidebar-active) !important;
+    --row-bg: var(--codex-sidebar-active) !important;
     border-radius: 8px !important;
 }
-[data-testid="conversation-row-sidebar"].bg-sidebar-secondary span.truncate {
+[data-testid="conversation-row-sidebar"].bg-sidebar-secondary span.truncate,
+[data-testid="conversation-row-sidebar"][data-selected="true"] span.truncate,
+.agy-sidebar-row[data-selected="true"] span.truncate {
     color: var(--codex-text) !important;
     font-weight: 500 !important;
 }
@@ -238,7 +378,7 @@ aside {
 }
 [data-testid="conversation-row-sidebar"]:hover .tabular-nums {
     display: inline-block !important;
-    opacity: 0.72 !important;
+    opacity: 0.8 !important;
     margin-left: 6px !important;
 }
 
@@ -247,7 +387,7 @@ aside {
 [data-testid="pinned-section-header"],
 [data-testid="conversation-list-sidebar"] [class*="text-xs"] {
     font-size: 12px !important;
-    font-weight: 400 !important;
+    font-weight: 500 !important;
     letter-spacing: 0.2px !important;
     color: var(--codex-text-muted) !important;
 }
@@ -255,18 +395,18 @@ aside {
 /* 项目折叠标题 */
 [data-testid="project-header"],
 [data-testid="conversation-list-sidebar"] .text-sm {
-    font-size: 13.5px !important;
-    font-weight: 400 !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
     color: var(--codex-text-row) !important;
 }
 
 /* 侧边栏折叠控制按钮 */
 [data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button) {
-    font-size: 12.5px !important;
+    font-size: 13px !important;
     line-height: 19px !important;
     color: var(--codex-text-muted) !important;
-    padding-top: 4px !important;
-    padding-bottom: 4px !important;
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
 }
 
 /* 左侧顶部与底部导航按钮 */
@@ -276,10 +416,11 @@ aside {
 [data-testid="automations-button"],
 [data-testid="settings-button"],
 [data-testid="sidebar-navigation-items"] button {
-    min-height: 33px !important;
+    min-height: 31px !important;
+    font-family: var(--font-sans) !important;
     font-size: 14px !important;
     font-weight: 400 !important;
-    padding: 5px 10px !important;
+    padding: 4px 10px !important;
     gap: 8px !important;
     border-radius: 8px !important;
     color: var(--codex-text-row) !important;
@@ -306,7 +447,7 @@ aside {
     background-color: var(--codex-scroll-thumb-hover) !important;
 }
 
-/* 4. 主对话视口 (Main Chat Canvas) - 无缝铺满 + 顶部极淡分隔 */
+/* 4. 主对话视口 (Main Chat Canvas) - 无缝纯白/深灰铺满 */
 .browser-hole-opaque:has([data-testid="conversation-view"]) {
     background-color: var(--codex-bg) !important;
 }
@@ -323,9 +464,9 @@ main,
     background-color: var(--codex-bg) !important;
 }
 
-/* 约束正文最大阅读宽度至 720px，与底部输入框 100% 齐边 */
+/* 约束正文最大阅读宽度至 768px（扣内边距后净文字宽 ~725px，1:1 对齐 Codex 728px） */
 [data-testid="autoscroll-viewport"] > div {
-    max-width: 720px !important;
+    max-width: 768px !important;
     margin-left: auto !important;
     margin-right: auto !important;
     width: 100% !important;
@@ -336,14 +477,14 @@ main,
 
 /* 弱化左侧消息跳转圆点轨 */
 [data-testid="conversation-navigator"] {
-    opacity: 0.16 !important;
+    opacity: 0.18 !important;
     transition: opacity 0.2s ease !important;
 }
 [data-testid="conversation-navigator"]:hover {
     opacity: 0.85 !important;
 }
 
-/* 5. 用户提问气泡 (User Bubble) - 14px 精致浅蓝胶囊 */
+/* 5. 用户提问气泡 (User Bubble) */
 [data-testid="user-input-step"] {
     display: flex !important;
     flex-direction: column !important;
@@ -402,19 +543,19 @@ main,
     overflow: visible !important;
 }
 
-/* 提问文字：15px 饱满清晰 */
+/* 提问文字：15.5px 饱满实墨 */
 [data-testid="user-input-step"] [data-quotable="true"],
 [data-testid="user-input-step"] .whitespace-pre-wrap,
 [data-testid="user-input-step"] p,
 [data-testid="user-message-content"] {
-    font-family: "Segoe UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif !important;
-    font-size: 15px !important;
-    line-height: 1.6 !important;
+    font-family: var(--font-sans) !important;
+    font-size: 15.5px !important;
+    line-height: 1.62 !important;
     color: var(--codex-bubble-fg) !important;
     font-weight: 400 !important;
+    text-shadow: var(--codex-ink-prose) !important;
 }
 
-/* 用户消息下方操作栏 */
 [data-testid="user-message-actions"] {
     background: transparent !important;
     border: none !important;
@@ -427,7 +568,6 @@ main,
     font-size: 11.5px !important;
 }
 
-/* 兼容 2.24 旧版气泡内悬停按钮 */
 [data-testid="user-input-step"] .user-input-buttons-container {
     position: absolute !important;
     right: calc(100% + 8px) !important;
@@ -445,109 +585,149 @@ main,
     white-space: nowrap !important;
 }
 
-/* 6. AI 回答正文区域 (Assistant Response) - 15.5px / 1.7 舒适饱满呼吸感排版 */
+/* 6. AI 回答正文区域 (Assistant Response) - 16px / 1.66 实墨饱满 Regular 400 */
 [data-testid="conversation-view"] p,
 [data-testid="planner-response-text"] p,
+[data-markdown-root] p,
+.markdown p,
 .prose p {
-    font-size: 15.5px !important;
-    line-height: 1.7 !important;
+    font-family: var(--font-sans) !important;
+    font-size: 16px !important;
+    line-height: 1.66 !important;
     color: var(--codex-text) !important;
     margin-top: 0 !important;
     margin-bottom: 12px !important;
     font-weight: 400 !important;
-    letter-spacing: 0px !important;
+    letter-spacing: 0.1px !important;
+    text-shadow: var(--codex-ink-prose) !important;
 }
 
 [data-testid="conversation-view"] ul,
 [data-testid="planner-response-text"] ul,
+[data-markdown-root] ul,
+.markdown ul,
 .prose ul {
     list-style-type: disc !important;
     list-style-position: outside !important;
     padding-left: 1.35rem !important;
     margin-top: 4px !important;
     margin-bottom: 12px !important;
-    font-size: 15.5px !important;
+    font-family: var(--font-sans) !important;
+    font-size: 16px !important;
     font-weight: 400 !important;
     color: var(--codex-text) !important;
 }
 
 [data-testid="conversation-view"] ol,
 [data-testid="planner-response-text"] ol,
+[data-markdown-root] ol,
+.markdown ol,
 .prose ol {
     list-style-type: decimal !important;
     list-style-position: outside !important;
     padding-left: 1.35rem !important;
     margin-top: 4px !important;
     margin-bottom: 12px !important;
-    font-size: 15.5px !important;
+    font-family: var(--font-sans) !important;
+    font-size: 16px !important;
     font-weight: 400 !important;
     color: var(--codex-text) !important;
 }
 
 [data-testid="conversation-view"] li,
 [data-testid="planner-response-text"] li,
+[data-markdown-root] li,
+.markdown li,
 .prose li {
-    font-size: 15.5px !important;
-    line-height: 1.7 !important;
+    font-family: var(--font-sans) !important;
+    font-size: 16px !important;
+    line-height: 1.66 !important;
     color: var(--codex-text) !important;
     margin-bottom: 6px !important;
     padding-left: 3px !important;
     font-weight: 400 !important;
+    letter-spacing: 0.1px !important;
+    text-shadow: var(--codex-ink-prose) !important;
 }
 
 [data-testid="conversation-view"] li::marker,
+[data-markdown-root] li::marker,
+.markdown li::marker,
 .prose li::marker {
     color: var(--codex-marker) !important;
     font-weight: 400 !important;
 }
 
-/* 标题层次 */
+/* 标题层次与重点强调：强制纯黑 #000000（深色 #FFFFFF）+ 700 真粗体，与普通正文拉开 Codex 式清晰层次 */
 [data-testid="conversation-view"] h1,
+[data-markdown-root] h1,
+.markdown h1,
 .prose h1 {
+    font-family: var(--font-sans) !important;
     font-size: 19px !important;
     line-height: 1.45 !important;
-    font-weight: 600 !important;
-    color: var(--codex-text) !important;
+    font-weight: 700 !important;
+    color: var(--codex-text-strong) !important;
+    text-shadow: var(--codex-ink-bold) !important;
     margin-top: 18px !important;
     margin-bottom: 8px !important;
 }
 [data-testid="conversation-view"] h2,
+[data-markdown-root] h2,
+.markdown h2,
 .prose h2 {
+    font-family: var(--font-sans) !important;
     font-size: 17px !important;
     line-height: 1.45 !important;
-    font-weight: 600 !important;
-    color: var(--codex-text) !important;
+    font-weight: 700 !important;
+    color: var(--codex-text-strong) !important;
+    text-shadow: var(--codex-ink-bold) !important;
     margin-top: 16px !important;
     margin-bottom: 8px !important;
 }
 [data-testid="conversation-view"] h3,
+[data-markdown-root] h3,
+.markdown h3,
 .prose h3 {
+    font-family: var(--font-sans) !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
-    font-weight: 600 !important;
-    color: var(--codex-text) !important;
+    font-weight: 700 !important;
+    color: var(--codex-text-strong) !important;
+    text-shadow: var(--codex-ink-bold) !important;
     margin-top: 14px !important;
     margin-bottom: 6px !important;
 }
 [data-testid="conversation-view"] h4,
+[data-markdown-root] h4,
+.markdown h4,
 .prose h4 {
+    font-family: var(--font-sans) !important;
     font-size: 15.5px !important;
     line-height: 1.5 !important;
-    font-weight: 600 !important;
-    color: var(--codex-text) !important;
+    font-weight: 700 !important;
+    color: var(--codex-text-strong) !important;
+    text-shadow: var(--codex-ink-bold) !important;
     margin-top: 10px !important;
     margin-bottom: 4px !important;
 }
 
 [data-testid="conversation-view"] strong,
 [data-testid="conversation-view"] b,
+[data-markdown-root] strong,
+[data-markdown-root] b,
+.markdown strong,
+.markdown b,
 .prose strong,
 .prose b {
-    font-weight: 600 !important;
-    color: var(--codex-text) !important;
+    font-family: var(--font-sans) !important;
+    font-weight: 700 !important;
+    color: var(--codex-text-strong) !important;
+    text-shadow: var(--codex-ink-bold) !important;
 }
 
 [data-testid="conversation-view"] hr,
+[data-markdown-root] hr,
 .prose hr {
     border-color: var(--codex-border) !important;
     margin-top: 14px !important;
@@ -555,6 +735,8 @@ main,
 }
 
 [data-testid="conversation-view"] blockquote,
+[data-markdown-root] blockquote,
+.markdown blockquote,
 .prose blockquote {
     border-left: 2.5px solid var(--codex-border-strong) !important;
     background-color: var(--codex-quote-bg) !important;
@@ -568,7 +750,7 @@ main,
 [data-testid="user-message-actions"],
 [data-testid="autoscroll-viewport"] div:has(> button[aria-label="复制"]):not(:has([data-testid="user-input-step"])):not(:has([data-testid="planner-response-text"])):not(:has(p)),
 [data-testid="autoscroll-viewport"] div:has(> button[aria-label="Copy"]):not(:has([data-testid="user-input-step"])):not(:has([data-testid="planner-response-text"])):not(:has(p)) {
-    opacity: 0.45 !important;
+    opacity: 0.5 !important;
     transition: opacity 0.18s ease !important;
 }
 [data-testid="user-message-actions"]:hover,
@@ -577,27 +759,28 @@ main,
     opacity: 1 !important;
 }
 
-/* 7. 行内代码胶囊 (Inline Code Pill) */
+/* 7. 行内代码胶囊 (Inline Code Pill) - 轻盈低干扰 */
 [data-testid="conversation-view"] code:not(pre code),
 [data-testid="planner-response-text"] code:not(pre code),
+[data-markdown-root] code:not(pre code),
 .prose code:not(pre code) {
-    font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace !important;
-    font-size: 13.5px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 14px !important;
     background-color: var(--codex-code-inline-bg) !important;
     color: var(--codex-text) !important;
-    padding: 1.5px 6px !important;
+    padding: 1px 5px !important;
     border-radius: 5px !important;
     border: none !important;
     box-shadow: none !important;
     font-weight: 400 !important;
-    margin: 0 2px !important;
+    margin: 0 1.5px !important;
     vertical-align: baseline !important;
 }
 
 /* 多行代码块 (Code Block) */
 [data-testid="conversation-view"] pre,
 .prose pre {
-    font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace !important;
+    font-family: var(--font-mono) !important;
     border-radius: 10px !important;
     border: 1px solid var(--codex-border) !important;
     background-color: var(--codex-code-block-bg) !important;
@@ -625,20 +808,20 @@ main,
     background-color: var(--codex-table-head-bg) !important;
     color: var(--codex-text-secondary) !important;
     font-weight: 500 !important;
-    font-size: 13px !important;
-    padding: 7px 12px !important;
+    font-size: 13.5px !important;
+    padding: 8px 12px !important;
     border-bottom: 1px solid var(--codex-border) !important;
 }
 [data-testid="conversation-view"] td,
 .prose td {
-    padding: 7px 12px !important;
-    font-size: 13px !important;
+    padding: 8px 12px !important;
+    font-size: 13.5px !important;
     line-height: 1.58 !important;
     color: var(--codex-text) !important;
     border-bottom: 1px solid var(--codex-border-row) !important;
 }
 
-/* 9. 工具步骤、思考折叠栏与运行状态提示 - 清晰中浅灰，消除双重透明看不清 */
+/* 9. 工具步骤、思考折叠栏与运行状态提示 - 清晰中灰，杜绝双重透明 */
 [data-testid="tool-group-collapsible"],
 [data-testid="worked-for-collapsible"],
 [data-testid="thinking-collapsible-trigger"],
@@ -647,6 +830,7 @@ main,
 [data-testid="autoscroll-viewport"] button.text-base:has(.text-muted-foreground),
 button:has(> [class*="tabular-nums"]) {
     opacity: 1 !important;
+    font-family: var(--font-sans) !important;
     font-size: 13px !important;
     line-height: 1.45 !important;
     font-weight: 400 !important;
@@ -680,7 +864,7 @@ button:has(> [class*="tabular-nums"]) {
     color: var(--codex-text-subtle) !important;
 }
 
-/* 10. 底部输入框区域 (Agent Input Box) - 跟随原生 --max-conversation-width (720px) 严格同宽齐边 */
+/* 10. 底部输入框区域 (Agent Input Box) - 跟随原生 --max-conversation-width (720px) 严格齐边 */
 [data-testid="agent-input-box"] {
     background-color: transparent !important;
     border: none !important;
@@ -716,11 +900,13 @@ button:has(> [class*="tabular-nums"]) {
 [data-testid="agent-input-box"] [contenteditable="true"],
 [data-testid="agent-input-box"] textarea,
 [data-testid="agent-input-box"] input {
-    min-height: 42px !important;
-    font-size: 15px !important;
+    min-height: 44px !important;
+    font-family: var(--font-sans) !important;
+    font-size: 15.5px !important;
     line-height: 1.55 !important;
     color: var(--codex-text) !important;
     font-weight: 400 !important;
+    text-shadow: var(--codex-ink-prose) !important;
 }
 
 [data-testid="conversation-view"] .bg-card:not([data-testid="user-input-step"] *):not(.surface-composer-card) {

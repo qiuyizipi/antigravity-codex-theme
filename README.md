@@ -4,7 +4,7 @@
 >
 > 适用版本：Antigravity 2.x 全系列（已专门适配 v2.34.0+ `app.asar.unpacked` 原生依赖拆分架构）
 >
-> 设计目标：直接对齐本地 OpenAI Codex 桌面端的设计规范，将 Antigravity 界面重构为无缝全屏白底画布、冰白侧边栏、720px 严格对齐阅读柱、15px/1.66 ClearType 深墨字体与单层 22px 精致输入框。
+> 设计目标：逐像素对齐本地 OpenAI Codex 桌面端的视觉规范，彻底根治 Windows Electron 下 Antigravity 2.34+ 字体发白、350 细字重断层与排版拥挤问题，呈现纯白无缝画布、`#F8F9FC` 清亮侧边栏、实墨 16px/1.66 正文与两档强调黑度层次。
 >
 > 安全承诺：纯 Node.js 原地修补 Chromium Pickle ASAR 索引，完整保留全部 `unpacked` 原生二进制依赖，写入前执行 `vm.Script` 语法校验，并自动备份支持秒级无损还原。
 
@@ -16,37 +16,37 @@
 
 ---
 
-## 核心特性（v4.4 Light & Dark 双色镜像）
+## 核心特性（v4.6 Solid-Ink 实墨双色版）
 
 1. 浅色 / 深色 / 跟随系统实时无缝切换与切号自愈
-- 所有颜色全面变量化（`--codex-*`），内置轻量级 `MutationObserver`、系统主题监听与 `<head>` 样式置底守护，切换浅色/深色/跟随系统或切换账号时毫秒级同步，并自动联动 Windows 原生右上角窗口控制按钮底色（`titleBarOverlay`），杜绝黑块、白块错乱与样式丢失。
-- 浅色模式还原 OpenAI Codex Light（薄荷云母顶栏、冰白侧边栏 `#F7FAFA`、纯白无缝画布 `#FFFFFF`、深墨字 `#0D0D0D`）。
-- 深色模式还原 OpenAI Codex Dark（`#212121` 深灰主画布、`#181818` 哑光侧边栏与顶栏、`#2A2A2A` 单层输入框、`#171717` 代码块、`#ECECEC` 柔白字）。
+- 所有颜色全面变量化（`--codex-*`），同步覆盖 Antigravity 原生 `--foreground` / `--secondary-foreground` / `--muted-foreground` / `--shell` / `--onyx-*` 语义令牌，完整兼容 `body.dark`（`html:has(> body.dark)`）。
+- 内置 `MutationObserver`、系统主题监听与 `<head>` 样式置底守护，切换浅色/深色/跟随系统或切换账号时毫秒级同步，并自动联动 Windows 原生右上角窗口控制按钮底色（`titleBarOverlay`），杜绝黑块、白块错乱与样式丢失。
+- 浅色模式还原 OpenAI Codex Light（清亮 `#F8F9FC` 统一顶栏与侧边栏、纯白无缝画布 `#FFFFFF`、深炭实墨 `#1B1F24` 正文与 `#000000` 强调字）。
+- 深色模式还原 OpenAI Codex Dark（`#212121` 深灰主画布、`#181818` 哑光侧边栏与顶栏、`#2B2B2B` 单层输入框、`#171717` 代码块、`#E6E6E6` 柔白正文与 `#FFFFFF` 强调字）。
 
-2. 全屏无缝画布与 720px 严格对齐
-- 移除对话区外圈 8px 留白与 12px 卡片圆角，还原 Codex 桌面端的通透白底画布。
-- 主对话流与底部输入框严格对齐至 `720px` 黄金阅读视宽，消除左右错位。
-- 底部输入框重构为单层 22px 圆角、96px 高度与极细浅灰边框。
+2. 根治 Windows 字体发白与两档强调黑度层次
+- 通过零外部依赖 `@font-face` 字重桥接（`CodexYaHei`）与原生字体变量接管，彻底清除 `Google Sans Flex` 350 细字重与 `wdth: 92` 窄轴污染，封死 Windows DirectWrite 向下误落 `Microsoft YaHei Light (300)`。
+- 正文统一采用 `16px / 1.66`、`400` 标准字重并配合浅色模式微像素实墨补偿；加粗与标题锁定 `700` 真粗体与纯黑 `#000000`（深色纯白 `#FFFFFF`），还原 Codex 清晰醒目的重点强调层次。
+- 取消上滑历史记录时的用户提问吸顶遮挡，长对话回溯视野彻底通透。
 
-2. 深墨字体与 Windows ClearType 次像素渲染
-- 正文统一采用 `15px / 1.66` 行高、400 标准字重、`#0D0D0D` 深墨色。
-- 开启 `subpixel-antialiased` 次像素渲染，告别原版发灰、笔画发虚的视觉疲劳。
-- 取消上滑历史记录时的用户提问吸顶遮挡，让长对话回溯视野彻底通透。
+3. 全屏无缝画布与 768px 严格齐边
+- 移除对话区外圈留白与卡片圆角，主对话流与底部输入框严格对齐至 `768px`（扣内边距后净文字宽约 `725px`，1:1 对齐 Codex 实测 `728px`）。
+- 底部输入框重构为单层 `22px` 圆角与极细浅灰边框，行内代码胶囊轻盈低干扰。
 
-3. 冰白净化侧边栏
-- 侧边栏采用 `#F7FAFA` 冰白背景、纯色吸顶分组标题与 3.5px 极细滚动条。
+4. 清亮净化侧边栏
+- 侧边栏采用 `#F8F9FC` 清亮冰白底色、`14px` 舒适字号、`30px` 轻盈行高与 `3.5px` 极细滚动条。
 - 会话时间戳默认隐藏，鼠标悬停时平滑显示，界面干净克制。
 
-4. 零依赖原地无损 ASAR 引擎（支持 v2.34.0+）
+5. 零依赖原地无损 ASAR 引擎（支持 v2.34.0+）
 - 摒弃会破坏 `app.asar.unpacked` 标记的传统全量解包重封，直接用内置 Node.js 原地修补 `dist/preload.js`。
 - 完整保留官方全部 377+ 个 `unpacked` 原生依赖，不依赖 Python，也不需要联网下载 `@electron/asar`。
 
-5. 运行时自动更新（下载一次，永久免重复下载）
+6. 运行时自动更新（下载一次，永久免重复下载）
 - 无论通过 `git clone` 还是网页下载 ZIP，每次双击安装脚本时都会自动联网检查 `qiuyizipi/antigravity-codex-theme` 的最新 `patch_theme.js` 和 `codex_theme.css`（自动兼容 Windows 系统代理，无需 Git）。
 - 若检测到新版脚本，会先通过 `vm.Script` 语法校验再替换，并自动无缝切换至新版继续执行；若处于离线或无法访问 GitHub 状态，自动降级使用本地文件完成安装（也支持加 `--no-update` 跳过联网检查）。
 
-6. 一键联动最新中文汉化
-- 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.4 主题。
+7. 一键联动最新中文汉化
+- 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.6 主题。
 - 客户端升级后只需双击一次即可同时完成“最新中文汉化 + Codex 主题”全套部署。
 
 ---
@@ -110,7 +110,7 @@ antigravity-codex-theme/
 ├── install.sh                       # macOS / Linux 安装入口（支持 --with-cn）
 ├── uninstall.sh                     # macOS / Linux 还原入口
 ├── patch_theme.js                   # 零依赖 Node.js 原地无损 ASAR 注入与校验引擎
-├── codex_theme.css                  # v4.4 Light & Dark 双色 Codex 样式表
+├── codex_theme.css                  # v4.6 Solid-Ink Light & Dark 双色 Codex 样式表
 ├── showimg/preview.png              # 实机效果截图
 ├── LICENSE                          # MIT 开源协议
 └── README.md                        # 说明文档
