@@ -124,11 +124,22 @@ function detectAntigravityPaths(manualPath) {
     add(process.env.ANTIGRAVITY_HOME);
 
     if (process.platform === 'win32') {
+        // 0. If Antigravity is currently running, read its exact executable path first (works for ANY custom folder!)
+        try {
+            const runningExe = execSync(
+                'powershell -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; (Get-Process Antigravity -ErrorAction SilentlyContinue | Select-Object -First 1).Path"',
+                { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 4000 }
+            ).trim();
+            if (runningExe) add(path.dirname(runningExe));
+        } catch {
+            // ignore
+        }
+
         const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
         add(path.join(localAppData, 'Programs', 'antigravity'));
         add(path.join(localAppData, 'antigravity'));
 
-        // Query Windows Uninstall Registry for custom install locations
+        // Query Windows Uninstall Registry in UTF-8 mode (avoids GBK mojibake on Chinese paths)
         const regRoots = [
             'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
             'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
@@ -136,7 +147,7 @@ function detectAntigravityPaths(manualPath) {
         ];
         for (const root of regRoots) {
             try {
-                const out = execSync(`reg query "${root}" /s /f Antigravity /d`, {
+                const out = execSync(`chcp 65001 >nul && reg query "${root}" /s /f Antigravity /d`, {
                     encoding: 'utf8',
                     stdio: ['ignore', 'pipe', 'ignore'],
                     timeout: 5000,
@@ -221,6 +232,31 @@ function ensureAntigravityClosed(noKill) {
             }
         }
         console.warn('[警告] Antigravity 可能仍有残留进程，若后续写入报占用，请右键系统托盘彻底退出后重试。');
+    } else if (process.platform === 'darwin' || process.platform === 'linux') {
+        try {
+            const chk = spawnSync('pgrep', ['-fi', 'Antigravity'], { stdio: 'ignore', timeout: 3000 });
+            if (chk.status === 0) {
+                console.warn('[提示] 检测到 Antigravity 可能正在运行，建议先完全退出客户端，补丁完成后再重新启动。');
+            }
+        } catch {
+            // ignore
+        }
+    }
+}
+
+function resignMacAppIfNeeded(asarPath) {
+    if (process.platform !== 'darwin') return;
+    const match = asarPath.match(/^(.*\.app)\/Contents\/Resources\/app\.asar$/i);
+    if (!match) return;
+    const appBundle = match[1];
+    console.log('[macOS] 正在执行 ad-hoc 重签名以防止 Apple Silicon 报“应用已损坏”...');
+    const res = spawnSync('codesign', ['--force', '--deep', '--sign', '-', appBundle], {
+        stdio: 'pipe',
+        encoding: 'utf8',
+        timeout: 30000,
+    });
+    if (res.status !== 0) {
+        console.warn(`[警告] macOS 重签名未成功（可手动执行: codesign --force --deep --sign - "${appBundle}"）`);
     }
 }
 
@@ -404,7 +440,7 @@ function buildInjection(css) {
         .replace(/\\/g, '\\\\')
         .replace(/`/g, '\\`')
         .replace(/\$/g, '\\$');
-    return `\n${SIG_START}\n(() => {\n    const themeCss = \`${escapedCss}\`;\n    function detectCodexMode() {\n        const h = document.documentElement;\n        const b = document.body;\n        const hc = h && h.classList;\n        const bc = b && b.classList;\n        const dt = (h && (h.getAttribute('data-theme') || h.getAttribute('data-color-scheme'))) ||\n            (b && (b.getAttribute('data-theme') || b.getAttribute('data-color-scheme'))) || '';\n        if ((hc && (hc.contains('dark') || hc.contains('theme-dark') || hc.contains('vscode-dark'))) ||\n            (bc && (bc.contains('dark') || bc.contains('theme-dark') || bc.contains('vscode-dark'))) ||\n            /dark/i.test(dt)) return 'dark';\n        if ((hc && (hc.contains('light') || hc.contains('theme-light') || hc.contains('vscode-light'))) ||\n            (bc && (bc.contains('light') || bc.contains('theme-light') || bc.contains('vscode-light'))) ||\n            /light/i.test(dt)) return 'light';\n        try {\n            const cs = h ? getComputedStyle(h).colorScheme : '';\n            if (cs && cs.includes('dark') && !cs.includes('light')) return 'dark';\n            if (cs && cs.includes('light') && !cs.includes('dark')) return 'light';\n        } catch {}\n        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';\n    }\n    function syncCodexMode() {\n        const h = document.documentElement;\n        if (!h) return;\n        const mode = detectCodexMode();\n        if (h.getAttribute('data-codex-mode') !== mode) {\n            h.setAttribute('data-codex-mode', mode);\n        }\n    }\n    let observerStarted = false;\n    function startThemeObserver() {\n        if (observerStarted || typeof MutationObserver === 'undefined') return;\n        const h = document.documentElement;\n        if (!h) return;\n        observerStarted = true;\n        const obs = new MutationObserver(syncCodexMode);\n        obs.observe(h, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme', 'style'] });\n        if (document.body) {\n            obs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme'] });\n        }\n        try {\n            const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');\n            if (mq && mq.addEventListener) mq.addEventListener('change', syncCodexMode);\n        } catch {}\n    }\n    function injectCodexTheme() {\n        syncCodexMode();\n        startThemeObserver();\n        let style = document.getElementById('antigravity-codex-theme-patch');\n        if (!style) {\n            style = document.createElement('style');\n            style.id = 'antigravity-codex-theme-patch';\n            style.textContent = themeCss;\n            (document.head || document.documentElement).appendChild(style);\n        }\n    }\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', injectCodexTheme);\n    } else {\n        injectCodexTheme();\n    }\n    window.addEventListener('load', injectCodexTheme);\n})();\n${SIG_END}\n`;
+    return `\n${SIG_START}\n(() => {\n    const themeCss = \`${escapedCss}\`;\n    function detectCodexMode() {\n        const h = document.documentElement;\n        const b = document.body;\n        const r = document.getElementById('root') || (b && b.firstElementChild);\n        const nodes = [h, b, r].filter(Boolean);\n        for (const el of nodes) {\n            const cl = el.classList;\n            const dt = el.getAttribute('data-theme') || el.getAttribute('data-color-scheme') || '';\n            if ((cl && (cl.contains('dark') || cl.contains('theme-dark') || cl.contains('vscode-dark'))) || /dark/i.test(dt)) return 'dark';\n            if ((cl && (cl.contains('light') || cl.contains('theme-light') || cl.contains('vscode-light'))) || /light/i.test(dt)) return 'light';\n        }\n        try {\n            const cs = h ? getComputedStyle(h).colorScheme : '';\n            if (cs && cs.includes('dark') && !cs.includes('light')) return 'dark';\n            if (cs && cs.includes('light') && !cs.includes('dark')) return 'light';\n        } catch {}\n        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';\n    }\n    function syncCodexMode() {\n        const h = document.documentElement;\n        if (!h) return;\n        const mode = detectCodexMode();\n        if (h.getAttribute('data-codex-mode') !== mode) {\n            h.setAttribute('data-codex-mode', mode);\n        }\n    }\n    let htmlObserved = false;\n    let bodyObserved = false;\n    let mqBound = false;\n    let obs = null;\n    function startThemeObserver() {\n        if (typeof MutationObserver !== 'undefined') {\n            if (!obs) obs = new MutationObserver(syncCodexMode);\n            if (!htmlObserved && document.documentElement) {\n                htmlObserved = true;\n                obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme', 'style'] });\n            }\n            if (!bodyObserved && document.body) {\n                bodyObserved = true;\n                obs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme'] });\n            }\n        }\n        if (!mqBound) {\n            mqBound = true;\n            try {\n                const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');\n                if (mq && mq.addEventListener) mq.addEventListener('change', syncCodexMode);\n            } catch {}\n        }\n    }\n    function injectCodexTheme() {\n        syncCodexMode();\n        startThemeObserver();\n        let style = document.getElementById('antigravity-codex-theme-patch');\n        if (!style) {\n            style = document.createElement('style');\n            style.id = 'antigravity-codex-theme-patch';\n            style.textContent = themeCss;\n            (document.head || document.documentElement).appendChild(style);\n        }\n    }\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', injectCodexTheme);\n    } else {\n        injectCodexTheme();\n    }\n    window.addEventListener('load', injectCodexTheme);\n})();\n${SIG_END}\n`;
 }
 
 function inspectAsar(asarPath) {
@@ -477,38 +513,51 @@ function hasCommand(cmd) {
 }
 
 // ============================================================================
-// Self-Update Engine (Git fast-forward OR proxy-aware raw HTTP for ZIP users)
+// Self-Update Engine (Git fast-forward OR single-shot proxy-aware HTTP for ZIP)
 // Fail-open: never blocks installation when offline or GitHub is unreachable
 // ============================================================================
-function downloadTextWithProxy(url, timeoutSec = 12) {
-    const tmpFile = path.join(os.tmpdir(), `codex_upd_${process.pid}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}.tmp`);
+function downloadPairWithProxy(urlCss, urlJs, timeoutSec = 8) {
+    const tag = `${process.pid}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+    const tmpCss = path.join(os.tmpdir(), `codex_css_${tag}.tmp`);
+    const tmpJs = path.join(os.tmpdir(), `codex_js_${tag}.tmp`);
     try {
-        let ok = false;
         if (process.platform === 'win32') {
+            const esc = (s) => s.replace(/'/g, "''");
+            // Single PowerShell invocation: if first download fails (offline/blocked), immediately abort instead of waiting twice
             const psCmd = [
+                '$ErrorActionPreference = "Stop";',
                 '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;',
-                `$ProgressPreference = 'SilentlyContinue';`,
-                `Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${url.replace(/'/g, "''")}' -OutFile '${tmpFile.replace(/'/g, "''")}'`,
+                '$ProgressPreference = "SilentlyContinue";',
+                `Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${esc(urlCss)}' -OutFile '${esc(tmpCss)}';`,
+                `Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${esc(urlJs)}' -OutFile '${esc(tmpJs)}'`,
             ].join(' ');
-            const ps = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCmd], {
+            spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCmd], {
                 stdio: 'ignore',
-                timeout: (timeoutSec + 6) * 1000,
+                timeout: (timeoutSec * 2 + 6) * 1000,
             });
-            ok = ps.status === 0 && fs.existsSync(tmpFile);
         } else {
-            const dl = spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpFile, url], {
+            const r1 = spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpCss, urlCss], {
                 stdio: 'ignore',
-                timeout: (timeoutSec + 6) * 1000,
+                timeout: (timeoutSec + 4) * 1000,
             });
-            ok = dl.status === 0 && fs.existsSync(tmpFile);
+            if (r1.status === 0) {
+                spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpJs, urlJs], {
+                    stdio: 'ignore',
+                    timeout: (timeoutSec + 4) * 1000,
+                });
+            }
         }
-        if (!ok) return null;
-        return fs.readFileSync(tmpFile, 'utf8');
+        return {
+            remoteCss: fs.existsSync(tmpCss) ? fs.readFileSync(tmpCss, 'utf8') : null,
+            remoteJs: fs.existsSync(tmpJs) ? fs.readFileSync(tmpJs, 'utf8') : null,
+        };
     } catch {
-        return null;
+        return { remoteCss: null, remoteJs: null };
     } finally {
-        if (fs.existsSync(tmpFile)) {
-            try { fs.unlinkSync(tmpFile); } catch {}
+        for (const f of [tmpCss, tmpJs]) {
+            if (fs.existsSync(f)) {
+                try { fs.unlinkSync(f); } catch {}
+            }
         }
     }
 }
@@ -589,10 +638,13 @@ function trySelfUpdate(opts) {
         return;
     }
 
-    // Case 2: ZIP download (no .git) -> proxy-aware raw HTTP sync with strict validation
+    // Case 2: ZIP download (no .git) -> single-shot proxy-aware raw HTTP sync with strict validation
     const cacheBust = `?t=${Date.now()}`;
-    const remoteCss = downloadTextWithProxy(`${SELF_RAW_BASE}/codex_theme.css${cacheBust}`, 12);
-    const remoteJs = downloadTextWithProxy(`${SELF_RAW_BASE}/patch_theme.js${cacheBust}`, 12);
+    const { remoteCss, remoteJs } = downloadPairWithProxy(
+        `${SELF_RAW_BASE}/codex_theme.css${cacheBust}`,
+        `${SELF_RAW_BASE}/patch_theme.js${cacheBust}`,
+        8
+    );
 
     if (!remoteCss && !remoteJs) {
         console.log('[自更新] 无法连接 GitHub（或网络超时），继续使用本地版本完成安装。');
@@ -803,14 +855,25 @@ function runInstall(opts) {
 
     const backupPath = `${detected.asarPath}.before_codex_patch.bak`;
     console.log('[1/3] 检查并维护安全备份...');
-    if (!fs.existsSync(backupPath)) {
+    const preInfo = inspectAsar(detected.asarPath);
+    let needRefreshBackup = !fs.existsSync(backupPath) || opts.withCn;
+    if (!needRefreshBackup && fs.existsSync(backupPath)) {
+        try {
+            const bakInfo = inspectAsar(backupPath);
+            // If Antigravity upgraded to a newer version, refresh stale backup instead of keeping an old version!
+            if (bakInfo.version !== preInfo.version && !preInfo.hasCodexTheme) {
+                console.log(`      检测到客户端已从 v${bakInfo.version} 升级至 v${preInfo.version}，自动刷新同版本安全备份...`);
+                needRefreshBackup = true;
+            }
+        } catch {
+            if (!preInfo.hasCodexTheme) needRefreshBackup = true;
+        }
+    }
+    if (needRefreshBackup) {
         copyWithRetry(detected.asarPath, backupPath);
-        console.log(`      已创建备份: ${backupPath}`);
-    } else if (opts.withCn) {
-        copyWithRetry(detected.asarPath, backupPath);
-        console.log(`      已更新汉化后备份: ${backupPath}`);
+        console.log(`      已创建/更新备份: ${backupPath} (v${preInfo.version})`);
     } else {
-        console.log('      已有备份文件存在，跳过覆盖。');
+        console.log(`      已有同版本备份 (v${preInfo.version})，跳过覆盖。`);
     }
 
     console.log('[2/3] 正在原地无损注入 Codex v4.1 主题（保留全部 unpacked 原生依赖）...');
@@ -825,6 +888,7 @@ function runInstall(opts) {
     new vm.Script(newPreload);
 
     const stats = patchAsarInPlace(detected.asarPath, detected.asarPath, { 'dist/preload.js': newPreload });
+    resignMacAppIfNeeded(detected.asarPath);
 
     console.log('[3/3] 正在执行最终封包校验...');
     const info = inspectAsar(detected.asarPath);
@@ -849,16 +913,30 @@ function runUninstall(opts) {
     ensureAntigravityClosed(opts.noKill);
 
     const backupPath = `${detected.asarPath}.before_codex_patch.bak`;
+    const curInfo = inspectAsar(detected.asarPath);
     if (fs.existsSync(backupPath)) {
-        copyWithRetry(backupPath, detected.asarPath);
-        console.log(`[OK] 已从备份无损恢复: ${backupPath}`);
-        console.log('请重新打开 Antigravity。');
-        return;
+        let bakVersionMatches = false;
+        try {
+            const bakInfo = inspectAsar(backupPath);
+            bakVersionMatches = bakInfo.version === curInfo.version;
+            if (!bakVersionMatches) {
+                console.warn(`[保护] 检测到备份版本 (v${bakInfo.version}) 与当前客户端版本 (v${curInfo.version}) 不一致，禁止跨版本覆盖，改用安全原地剥离！`);
+            }
+        } catch {
+            bakVersionMatches = false;
+        }
+        if (bakVersionMatches) {
+            copyWithRetry(backupPath, detected.asarPath);
+            resignMacAppIfNeeded(detected.asarPath);
+            console.log(`[OK] 已从同版本备份无损恢复: ${backupPath} (v${curInfo.version})`);
+            console.log('请重新打开 Antigravity。');
+            return;
+        }
     }
 
     const preloadBuf = readAsarFile(detected.asarPath, 'dist/preload.js');
     if (!preloadBuf) {
-        throw new Error('无法读取 dist/preload.js，且未找到备份文件。');
+        throw new Error('无法读取 dist/preload.js，且未找到匹配的备份文件。');
     }
     const original = preloadBuf.toString('utf8');
     if (!original.includes(SIG_START)) {
@@ -868,7 +946,8 @@ function runUninstall(opts) {
     const stripped = stripCodexTheme(original);
     new vm.Script(stripped);
     patchAsarInPlace(detected.asarPath, detected.asarPath, { 'dist/preload.js': stripped });
-    console.log('[OK] 已原地无损移除 Codex 主题补丁。请重新打开 Antigravity。');
+    resignMacAppIfNeeded(detected.asarPath);
+    console.log('[OK] 已原地无损移除 Codex 主题补丁（保留当前客户端版本与汉化）。请重新打开 Antigravity。');
 }
 
 function main() {
