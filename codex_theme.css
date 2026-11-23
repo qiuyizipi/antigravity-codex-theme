@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Antigravity 1:1 Codex Mirror Aesthetic Theme (v4.1 Dual-Mode Edition)
+   Antigravity 1:1 Codex Mirror Aesthetic Theme (v4.2 Dual-Mode Edition)
    完整支持浅色模式（Light）与深色模式（Dark）实时无缝切换：
    - 浅色模式：对齐 OpenAI Codex Light（云母顶栏、冰白边栏、纯白画布、15px ClearType 深墨字）
    - 深色模式：对齐 OpenAI Codex Dark（#212121 主画布、#181818 边栏、#2A2A2A 输入框、#ECECEC 柔白字）
@@ -20,7 +20,7 @@ html[data-codex-mode="light"] {
     --codex-sidebar-hover: rgba(15, 23, 42, 0.04);
     --codex-sidebar-nav-hover: rgba(15, 23, 42, 0.05);
     --codex-titlebar-bg: linear-gradient(90deg, #EBF8F6 0%, #EFFAF6 50%, #F4FBF4 100%);
-    --codex-titlebar-solid: #EAF8F5;
+    --codex-titlebar-solid: #F4FBF4;
     --codex-titlebar-fg: #1F2937;
     --codex-text: #0D0D0D;
     --codex-text-row: #1A1C1F;
@@ -67,7 +67,7 @@ body.theme-dark {
     --codex-sidebar-active: rgba(255, 255, 255, 0.10);
     --codex-sidebar-hover: rgba(255, 255, 255, 0.06);
     --codex-sidebar-nav-hover: rgba(255, 255, 255, 0.07);
-    --codex-titlebar-bg: #181818;
+    --codex-titlebar-bg: none;
     --codex-titlebar-solid: #181818;
     --codex-titlebar-fg: #E5E7EB;
     --codex-text: #ECECEC;
@@ -166,9 +166,10 @@ body.theme-dark {
     color: var(--codex-text) !important;
 }
 
-/* 2. 顶部窗体菜单栏 */
+/* 2. 顶部窗体菜单栏（拆开 background-color 与 background-image，避免 Electron 取到透明黑） */
 [data-testid="title-menu-bar"] {
-    background: var(--codex-titlebar-bg) !important;
+    background-color: var(--codex-titlebar-solid) !important;
+    background-image: var(--codex-titlebar-bg) !important;
     border-bottom: none !important;
     font-size: 13px !important;
     color: var(--codex-titlebar-fg) !important;
@@ -350,6 +351,7 @@ main,
     padding-top: 0.9rem !important;
     padding-bottom: 0.5rem !important;
     width: 100% !important;
+    opacity: 1 !important;
 }
 
 [data-testid="user-input-step"] > div:not([data-testid="user-message-actions"]) {
@@ -562,14 +564,16 @@ main,
     margin: 8px 0 12px !important;
 }
 
-/* 弱化每条 AI 回答底部的操作栏，悬停显现 */
-[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="复制"]),
-[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="Copy"]) {
-    opacity: 0.35 !important;
+/* 仅弱化消息底部独立操作栏本身，严格排除用户气泡与正文容器 */
+[data-testid="user-message-actions"],
+[data-testid="autoscroll-viewport"] div:has(> button[aria-label="复制"]):not(:has([data-testid="user-input-step"])):not(:has([data-testid="planner-response-text"])):not(:has(p)),
+[data-testid="autoscroll-viewport"] div:has(> button[aria-label="Copy"]):not(:has([data-testid="user-input-step"])):not(:has([data-testid="planner-response-text"])):not(:has(p)) {
+    opacity: 0.42 !important;
     transition: opacity 0.18s ease !important;
 }
-[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="复制"]):hover,
-[data-testid="autoscroll-viewport"] div:has(> div > button[aria-label="Copy"]):hover {
+[data-testid="user-message-actions"]:hover,
+[data-testid="autoscroll-viewport"] div:has(> button[aria-label="复制"]):not(:has([data-testid="user-input-step"])):not(:has([data-testid="planner-response-text"])):not(:has(p)):hover,
+[data-testid="autoscroll-viewport"] div:has(> button[aria-label="Copy"]):not(:has([data-testid="user-input-step"])):not(:has([data-testid="planner-response-text"])):not(:has(p)):hover {
     opacity: 1 !important;
 }
 
