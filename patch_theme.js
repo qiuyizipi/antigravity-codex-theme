@@ -399,7 +399,7 @@ function buildInjection(css) {
         .replace(/\\/g, '\\\\')
         .replace(/`/g, '\\`')
         .replace(/\$/g, '\\$');
-    return `\n${SIG_START}\n(() => {\n    const themeCss = \`${escapedCss}\`;\n    function injectCodexTheme() {\n        if (document.getElementById('antigravity-codex-theme-patch')) return;\n        const style = document.createElement('style');\n        style.id = 'antigravity-codex-theme-patch';\n        style.textContent = themeCss;\n        (document.head || document.documentElement).appendChild(style);\n    }\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', injectCodexTheme);\n    } else {\n        injectCodexTheme();\n    }\n    window.addEventListener('load', injectCodexTheme);\n})();\n${SIG_END}\n`;
+    return `\n${SIG_START}\n(() => {\n    const themeCss = \`${escapedCss}\`;\n    function detectCodexMode() {\n        const h = document.documentElement;\n        const b = document.body;\n        const hc = h && h.classList;\n        const bc = b && b.classList;\n        const dt = (h && (h.getAttribute('data-theme') || h.getAttribute('data-color-scheme'))) ||\n            (b && (b.getAttribute('data-theme') || b.getAttribute('data-color-scheme'))) || '';\n        if ((hc && (hc.contains('dark') || hc.contains('theme-dark') || hc.contains('vscode-dark'))) ||\n            (bc && (bc.contains('dark') || bc.contains('theme-dark') || bc.contains('vscode-dark'))) ||\n            /dark/i.test(dt)) return 'dark';\n        if ((hc && (hc.contains('light') || hc.contains('theme-light') || hc.contains('vscode-light'))) ||\n            (bc && (bc.contains('light') || bc.contains('theme-light') || bc.contains('vscode-light'))) ||\n            /light/i.test(dt)) return 'light';\n        try {\n            const cs = h ? getComputedStyle(h).colorScheme : '';\n            if (cs && cs.includes('dark') && !cs.includes('light')) return 'dark';\n            if (cs && cs.includes('light') && !cs.includes('dark')) return 'light';\n        } catch {}\n        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';\n    }\n    function syncCodexMode() {\n        const h = document.documentElement;\n        if (!h) return;\n        const mode = detectCodexMode();\n        if (h.getAttribute('data-codex-mode') !== mode) {\n            h.setAttribute('data-codex-mode', mode);\n        }\n    }\n    let observerStarted = false;\n    function startThemeObserver() {\n        if (observerStarted || typeof MutationObserver === 'undefined') return;\n        const h = document.documentElement;\n        if (!h) return;\n        observerStarted = true;\n        const obs = new MutationObserver(syncCodexMode);\n        obs.observe(h, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme', 'style'] });\n        if (document.body) {\n            obs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme'] });\n        }\n        try {\n            const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');\n            if (mq && mq.addEventListener) mq.addEventListener('change', syncCodexMode);\n        } catch {}\n    }\n    function injectCodexTheme() {\n        syncCodexMode();\n        startThemeObserver();\n        let style = document.getElementById('antigravity-codex-theme-patch');\n        if (!style) {\n            style = document.createElement('style');\n            style.id = 'antigravity-codex-theme-patch';\n            style.textContent = themeCss;\n            (document.head || document.documentElement).appendChild(style);\n        }\n    }\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', injectCodexTheme);\n    } else {\n        injectCodexTheme();\n    }\n    window.addEventListener('load', injectCodexTheme);\n})();\n${SIG_END}\n`;
 }
 
 function inspectAsar(asarPath) {
@@ -608,7 +608,7 @@ function syncAndRunCnLocalization(opts, detected) {
     if (res.status !== 0) {
         throw new Error(`中文汉化脚本退出异常（exit code ${res.status}）`);
     }
-    console.log('[联动汉化] 中文汉化完成，准备叠加注入 Codex v4.0 主题...\n');
+    console.log('[联动汉化] 中文汉化完成，准备叠加注入 Codex v4.1 主题...\n');
 }
 
 // ============================================================================
@@ -619,7 +619,7 @@ function printBanner(opts) {
     if (opts.mode === 'uninstall') {
         console.log('        Antigravity Codex 主题无损卸载与还原工具');
     } else if (opts.withCn) {
-        console.log('   Antigravity 一键联动最新中文汉化 + Codex v4.0 主题');
+        console.log('   Antigravity 一键联动最新中文汉化 + Codex v4.1 主题');
         console.log('   说明：自动同步 Silas-02 最新汉化，再原地无损注入主题');
     } else {
         console.log('      Antigravity 1:1 Codex 桌面端美化补丁（原地无损）');
@@ -655,7 +655,7 @@ function runInstall(opts) {
         console.log('      已有备份文件存在，跳过覆盖。');
     }
 
-    console.log('[2/3] 正在原地无损注入 Codex v4.0 主题（保留全部 unpacked 原生依赖）...');
+    console.log('[2/3] 正在原地无损注入 Codex v4.1 主题（保留全部 unpacked 原生依赖）...');
     const preloadBuf = readAsarFile(detected.asarPath, 'dist/preload.js');
     if (!preloadBuf) {
         throw new Error('无法从 app.asar 读取 dist/preload.js');
