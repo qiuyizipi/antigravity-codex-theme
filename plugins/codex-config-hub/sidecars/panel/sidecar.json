@@ -1,0 +1,18 @@
+{
+  "command": "node.exe",
+  "args": ["server.mjs"],
+  "restart_policy": "always",
+  "display_name": "配置总览 Config Hub",
+  "description": "在右侧边栏集中查看与编辑全局规则、Skills、MCP 服务、插件以及汉化/Codex 主题生效状态。",
+  "has_web_ui": true,
+  "ui_config": {
+    "display_name": "配置总览 Config Hub",
+    "views": [
+      {
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "title": "配置总览"
+      }
+    ]
+  }
+}

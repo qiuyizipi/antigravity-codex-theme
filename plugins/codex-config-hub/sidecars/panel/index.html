@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>配置总览 · Config Hub</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/preload.js"></script>
+</head>
+<body class="theme-light">
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-badge">CFG</span>
+        <div class="brand-meta">
+          <div class="brand-title">全局配置总览</div>
+          <div class="brand-sub" id="last-scan">正在扫描本机配置…</div>
+        </div>
+      </div>
+      <button id="btn-refresh" class="btn btn-ghost" title="重新扫描全部本地配置文件">刷新</button>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="overview">总览</button>
+      <button class="tab" data-tab="rules">规则</button>
+      <button class="tab" data-tab="skills">Skills <span class="tab-count" id="tab-skills-count">0</span></button>
+      <button class="tab" data-tab="mcp">MCP <span class="tab-count" id="tab-mcp-count">0</span></button>
+      <button class="tab" data-tab="plugins">插件 <span class="tab-count" id="tab-plugins-count">0</span></button>
+    </nav>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <main class="content">
+      <!-- 1. 总览 -->
+      <section class="panel is-active" id="panel-overview">
+        <div class="stats-grid">
+          <button class="stat-card" data-jump="rules">
+            <span class="stat-label">全局规则</span>
+            <span class="stat-val" id="stat-agents">—</span>
+            <span class="stat-sub" id="stat-agents-sub">AGENTS.md</span>
+          </button>
+          <button class="stat-card" data-jump="skills">
+            <span class="stat-label">Skills</span>
+            <span class="stat-val" id="stat-skills">0</span>
+            <span class="stat-sub" id="stat-skills-sub">~/.gemini/config/skills</span>
+          </button>
+          <button class="stat-card" data-jump="mcp">
+            <span class="stat-label">MCP 服务</span>
+            <span class="stat-val" id="stat-mcp">0</span>
+            <span class="stat-sub" id="stat-mcp-sub">全局 + 插件内置</span>
+          </button>
+          <button class="stat-card" data-jump="plugins">
+            <span class="stat-label">原生插件</span>
+            <span class="stat-val" id="stat-plugins">0</span>
+            <span class="stat-sub">plugins 目录</span>
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">客户端与补丁生效状态</span>
+            <span class="pill" id="client-version">探测中</span>
+          </div>
+          <div class="kv-list" id="client-kv"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">核心用户设置（config.json）</span>
+            <button class="btn-link" id="btn-open-config-json">打开文件</button>
+          </div>
+          <div class="kv-list" id="settings-kv"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">一键直达底层目录</span>
+          </div>
+          <div class="quick-actions" id="quick-actions"></div>
+        </div>
+      </section>
+
+      <!-- 2. 规则与记忆 -->
+      <section class="panel" id="panel-rules">
+        <div class="doc-bar">
+          <div class="seg-group">
+            <button class="seg is-active" data-doc="agents">全局规则 AGENTS.md</button>
+            <button class="seg" data-doc="memory">长期记忆 MEMORY.md</button>
+          </div>
+          <button class="btn-link" id="btn-open-doc-file">外部打开</button>
+        </div>
+        <div class="doc-meta" id="doc-meta">加载中…</div>
+        <textarea id="doc-editor" class="doc-editor" spellcheck="false" placeholder="文件内容为空"></textarea>
+        <div class="doc-actions">
+          <span class="doc-dirty" id="doc-dirty">已同步</span>
+          <div class="doc-btns">
+            <button id="btn-revert-doc" class="btn btn-ghost" disabled>撤销更改</button>
+            <button id="btn-save-doc" class="btn btn-primary" disabled>保存并验证</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Skills -->
+      <section class="panel" id="panel-skills">
+        <div class="toolbar">
+          <input id="skills-search" class="search-input" type="search" placeholder="搜索 Skill 名称或用途…" />
+          <button id="btn-open-skills-dir" class="btn btn-ghost">打开目录</button>
+        </div>
+        <div class="list-summary" id="skills-summary"></div>
+        <div class="item-list" id="skills-list"></div>
+      </section>
+
+      <!-- 4. MCP -->
+      <section class="panel" id="panel-mcp">
+        <div class="toolbar">
+          <span class="toolbar-hint">密钥值已自动脱敏，仅展示键名</span>
+          <button id="btn-open-mcp-json" class="btn btn-ghost">编辑 mcp_config.json</button>
+        </div>
+        <div class="item-list" id="mcp-list"></div>
+      </section>
+
+      <!-- 5. 插件 -->
+      <section class="panel" id="panel-plugins">
+        <div class="toolbar">
+          <span class="toolbar-hint">目录 ~/.gemini/config/plugins</span>
+          <button id="btn-open-plugins-dir" class="btn btn-ghost">打开目录</button>
+        </div>
+        <div class="item-list" id="plugins-list"></div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

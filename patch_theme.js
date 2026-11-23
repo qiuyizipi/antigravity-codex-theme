@@ -9,6 +9,7 @@ const { spawnSync, execSync } = require('child_process');
 
 const SCRIPT_DIR = __dirname;
 const CSS_PATH = path.join(SCRIPT_DIR, 'codex_theme.css');
+const CONFIG_HUB_SRC = path.join(SCRIPT_DIR, 'plugins', 'codex-config-hub');
 const SELF_RAW_BASE = (process.env.CODEX_THEME_RAW_BASE || 'https://raw.githubusercontent.com/qiuyizipi/antigravity-codex-theme/main').replace(/\/+$/, '');
 const CN_REPO_URL = 'https://github.com/Silas-02/antigravity-desktop-cn.git';
 const CN_ZIP_URL = 'https://github.com/Silas-02/antigravity-desktop-cn/archive/refs/heads/main.zip';
@@ -32,10 +33,12 @@ function sleepSync(ms) {
 
 function parseArgs(argv) {
     const opts = {
-        mode: 'install', // install | uninstall | check
+        mode: 'install', // install | uninstall | check | doctor | install-hub
         withCn: false,
         noKill: false,
         noUpdate: false,
+        noHub: false,
+        removeHub: false,
         selfUpdated: false,
         watchCss: false,
         brandTitle: 'english',
@@ -45,9 +48,13 @@ function parseArgs(argv) {
         const a = argv[i];
         if (a === '--uninstall' || a === '--restore') opts.mode = 'uninstall';
         else if (a === '--check' || a === '--status') opts.mode = 'check';
+        else if (a === '--doctor') opts.mode = 'doctor';
+        else if (a === '--install-hub') opts.mode = 'install-hub';
         else if (a === '--with-cn') opts.withCn = true;
         else if (a === '--no-kill') opts.noKill = true;
         else if (a === '--no-update') opts.noUpdate = true;
+        else if (a === '--no-hub') opts.noHub = true;
+        else if (a === '--remove-hub') opts.removeHub = true;
         else if (a === '--self-updated') opts.selfUpdated = true;
         else if (a === '--watch-css') opts.watchCss = true;
         else if (a === '--brand-title' && argv[i + 1]) opts.brandTitle = argv[++i];
@@ -933,12 +940,142 @@ function runInstall(opts) {
         throw new Error('最终校验未通过，请检查 app.asar 状态。');
     }
 
+    let hubInstalled = false;
+    if (!opts.noHub && fs.existsSync(CONFIG_HUB_SRC)) {
+        const hubRes = installConfigHubPlugin();
+        hubInstalled = hubRes.installed;
+    }
+
     console.log('\n========================================================');
     console.log('  [OK] 成功！Codex 视觉与排版主题已无损部署到 Antigravity');
     console.log(`       版本: v${info.version} | 体积: ${(stats.finalSize / 1024 / 1024).toFixed(2)} MB | 原生依赖保留: ${stats.unpackedCount} 项`);
     console.log(`       中文汉化: ${info.hasCN ? '已启用' : '未启用'} | Codex 主题: 已启用 | 语法校验: 通过${info.hasHotCssIpc ? ' | IPC热重载: 已启用' : ''}`);
+    if (hubInstalled) {
+        console.log('       右侧栏「配置总览 (Config Hub)」插件: 已同步（重开后可在插件面板打开）');
+    }
     console.log('  请重新打开 Antigravity 即可体验全新界面。');
     console.log('========================================================');
+}
+
+function getGeminiConfigDir() {
+    const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
+    return path.join(home, '.gemini', 'config');
+}
+
+function copyDirRecursive(srcDir, dstDir) {
+    fs.mkdirSync(dstDir, { recursive: true });
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+        const s = path.join(srcDir, entry.name);
+        const d = path.join(dstDir, entry.name);
+        if (entry.isDirectory()) copyDirRecursive(s, d);
+        else fs.copyFileSync(s, d);
+    }
+}
+
+function installConfigHubPlugin() {
+    if (!fs.existsSync(CONFIG_HUB_SRC)) {
+        return { installed: false, reason: '仓库内未找到 plugins/codex-config-hub 目录' };
+    }
+    const targetDir = path.join(getGeminiConfigDir(), 'plugins', 'codex-config-hub');
+    copyDirRecursive(CONFIG_HUB_SRC, targetDir);
+
+    const sidecarJsonPath = path.join(targetDir, 'sidecars', 'panel', 'sidecar.json');
+    if (fs.existsSync(sidecarJsonPath)) {
+        const sc = JSON.parse(fs.readFileSync(sidecarJsonPath, 'utf8'));
+        sc.command = process.platform === 'win32' ? 'node.exe' : 'node';
+        fs.writeFileSync(sidecarJsonPath, JSON.stringify(sc, null, 2) + '\n', 'utf8');
+    }
+    JSON.parse(fs.readFileSync(path.join(targetDir, 'plugin.json'), 'utf8'));
+    return { installed: true, targetDir };
+}
+
+function runDoctor(opts) {
+    const configDir = getGeminiConfigDir();
+    const readJson = (p) => {
+        if (!fs.existsSync(p)) return null;
+        try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return { __parseError: true }; }
+    };
+
+    console.log('========================================================');
+    console.log('      Antigravity 全局配置与补丁生效状态体检 (--doctor)');
+    console.log('========================================================\n');
+
+    try {
+        const detected = detectAntigravityPaths(opts.manualPath);
+        const info = inspectAsar(detected.asarPath);
+        console.log('[1] 客户端与底层补丁');
+        console.log(`    安装文件   : ${info.asarPath}`);
+        console.log(`    客户端版本 : v${info.version} (语法校验: ${info.syntaxValid ? '通过' : '异常'}, unpacked: ${info.unpackedCount})`);
+        console.log(`    中文汉化   : ${info.hasCN ? '已启用' : '未安装'}`);
+        console.log(`    Codex 主题 : ${info.hasCodexTheme ? '已启用' : '未安装'}${info.hasHotCssIpc ? ' (IPC热重载已开)' : ''}\n`);
+    } catch (err) {
+        console.log(`[1] 客户端探测失败: ${err.message}\n`);
+    }
+
+    const cfgPath = path.join(configDir, 'config.json');
+    const cfg = readJson(cfgPath);
+    const us = (cfg && cfg.userSettings) || {};
+    console.log('[2] 核心用户设置');
+    console.log(`    配置文件   : ${cfgPath}`);
+    console.log(`    执行 / 审阅: ${us.autoExecutionPolicy || '默认'} / ${us.artifactReviewMode || '默认'}`);
+    console.log(`    主题 / 字号: ${us.themeMode || '默认'} / ${us.fontSize ?? '默认'}px`);
+    console.log(`    白名单规则 : ${Array.isArray(us.globalPermissionGrants && us.globalPermissionGrants.allow) ? us.globalPermissionGrants.allow.length : 0} 条\n`);
+
+    console.log('[3] 全局规则与长期记忆');
+    for (const name of ['AGENTS.md', 'MEMORY.md']) {
+        const fp = path.join(configDir, name);
+        if (fs.existsSync(fp)) {
+            const st = fs.statSync(fp);
+            const lines = fs.readFileSync(fp, 'utf8').split(/\r?\n/).length;
+            console.log(`    ${name.padEnd(10)} : 已配置 (${(st.size / 1024).toFixed(1)} KB, ${lines} 行) -> ${fp}`);
+        } else {
+            console.log(`    ${name.padEnd(10)} : 未创建 -> ${fp}`);
+        }
+    }
+    console.log('');
+
+    const skillsDir = path.join(configDir, 'skills');
+    let skillFolders = [];
+    let invalidSkills = [];
+    if (fs.existsSync(skillsDir)) {
+        skillFolders = fs.readdirSync(skillsDir, { withFileTypes: true }).filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name);
+        for (const s of skillFolders) {
+            const md = path.join(skillsDir, s, 'SKILL.md');
+            if (!fs.existsSync(md) || !/^---\r?\n[\s\S]*?\r?\n---/.test(fs.readFileSync(md, 'utf8'))) {
+                invalidSkills.push(s);
+            }
+        }
+    }
+    console.log(`[4] 全局 Skills (${skillFolders.length} 个) -> ${skillsDir}`);
+    console.log(`    正常: ${skillFolders.length - invalidSkills.length} | 异常: ${invalidSkills.length}${invalidSkills.length ? ` (${invalidSkills.join(', ')})` : ''}\n`);
+
+    const mcpPath = path.join(configDir, 'mcp_config.json');
+    const mcp = readJson(mcpPath);
+    const mcpServers = (mcp && mcp.mcpServers) || {};
+    console.log(`[5] 全局 MCP 服务 (${Object.keys(mcpServers).length} 个，密钥已脱敏) -> ${mcpPath}`);
+    for (const [name, def] of Object.entries(mcpServers)) {
+        const target = (def && (def.url || def.serverUrl)) || (def && def.command ? `${def.command} ${(def.args || []).join(' ')}` : 'unknown');
+        console.log(`    - ${name}: ${target}`);
+    }
+    console.log('');
+
+    const pluginsDir = path.join(configDir, 'plugins');
+    const pluginDirs = fs.existsSync(pluginsDir)
+        ? fs.readdirSync(pluginsDir, { withFileTypes: true }).filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name)
+        : [];
+    console.log(`[6] 已装原生插件 (${pluginDirs.length} 个) -> ${pluginsDir}`);
+    for (const p of pluginDirs) {
+        const pj = readJson(path.join(pluginsDir, p, 'plugin.json'));
+        const ver = (pj && pj.version) || 'local';
+        const tags = [];
+        if (fs.existsSync(path.join(pluginsDir, p, 'sidecars')) || fs.existsSync(path.join(pluginsDir, p, 'sidecars.json'))) tags.push('侧栏UI');
+        if (fs.existsSync(path.join(pluginsDir, p, 'mcp_config.json'))) tags.push('MCP');
+        if (fs.existsSync(path.join(pluginsDir, p, 'rules'))) tags.push('规则');
+        if (fs.existsSync(path.join(pluginsDir, p, 'hooks.json'))) tags.push('Hooks');
+        if (fs.existsSync(path.join(pluginsDir, p, 'skills'))) tags.push('Skills');
+        console.log(`    - ${p} (v${ver}) [${tags.join(', ') || '基础'}]`);
+    }
+    console.log('\n========================================================');
 }
 
 function runUninstall(opts) {
@@ -948,6 +1085,14 @@ function runUninstall(opts) {
 
     ensureWritable(detected.asarPath);
     ensureAntigravityClosed(opts.noKill);
+
+    if (opts.removeHub) {
+        const hubDir = path.join(getGeminiConfigDir(), 'plugins', 'codex-config-hub');
+        if (fs.existsSync(hubDir)) {
+            fs.rmSync(hubDir, { recursive: true, force: true });
+            console.log(`[清理] 已移除右侧栏配置总览插件: ${hubDir}`);
+        }
+    }
 
     const backupPath = `${detected.asarPath}.before_codex_patch.bak`;
     const curInfo = inspectAsar(detected.asarPath);
@@ -1003,6 +1148,13 @@ function main() {
             const detected = detectAntigravityPaths(opts.manualPath);
             const info = inspectAsar(detected.asarPath);
             console.log(JSON.stringify(info, null, 2));
+        } else if (opts.mode === 'doctor') {
+            runDoctor(opts);
+        } else if (opts.mode === 'install-hub') {
+            const res = installConfigHubPlugin();
+            if (!res.installed) throw new Error(res.reason);
+            console.log(`[OK] 已安装/更新原生右侧栏「配置总览 (Config Hub)」插件：${res.targetDir}`);
+            console.log('     请重启 Antigravity 后在右侧边栏插件列表打开「配置总览」。');
         } else if (opts.mode === 'uninstall') {
             runUninstall(opts);
         } else {

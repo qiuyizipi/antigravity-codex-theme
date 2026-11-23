@@ -1,0 +1,12 @@
+{
+  "name": "codex-config-hub",
+  "displayName": "配置总览 (Config Hub)",
+  "version": "1.0.0",
+  "description": "在右侧边栏一屏查看与管理全局规则 (AGENTS.md)、长期记忆 (MEMORY.md)、全部 Skills、MCP 服务、已装插件及汉化/Codex 主题生效状态，支持在线编辑保存、端口连通检测与一键打开目录。",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "打开配置总览侧边栏查看全局规则、Skills、MCP 和插件状态",
+    "检查全局 AGENTS.md 和 MCP 是否全部生效",
+    "在配置总览里搜索已安装的 Skills"
+  ]
+}
