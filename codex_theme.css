@@ -1,9 +1,9 @@
 /* ==========================================================================
-   Antigravity 1:1 Codex Mirror Aesthetic Theme (v4.3 True-Token Edition)
-   1:1 对齐 OpenAI Codex 桌面端 (v26.1117) 原厂实测令牌：
-   - 原厂字体渲染：14px / 1.65 + -webkit-font-smoothing: antialiased + 常规微软雅黑（告别发粗粘连）
-   - 原厂色彩层次：顶栏与左边栏统一清雅冷灰 #F4F6F7，主画布纯白 #FFFFFF，正文柔和炭黑 #1A1C1F
-   - 原厂黄金列宽：42rem (672px) 正文与底部输入框 100% 严格齐边
+   Antigravity 1:1 Codex Mirror Aesthetic Theme (v4.4 True-Scale Edition)
+   1:1 对齐 OpenAI Codex 桌面端实机观感：
+   - 饱满清晰字号：正文 15.5px / 1.68、左侧边栏 14px、输入框与气泡 15px，标准 Microsoft YaHei（告别窄体发糊）
+   - 原厂色彩层次：顶栏、右上角窗口按钮与左边栏统一清雅冷灰 #F4F6F7，主画布纯白 #FFFFFF，正文柔和炭黑 #1A1C1F
+   - 720px 严格上下齐边：正文与底部输入框 100% 左右对齐
    - 完整双色模式：浅色 / 深色 / 跟随系统实时无缝切换 + 原生顶栏按钮同步
    ========================================================================== */
 
@@ -50,7 +50,7 @@ html[data-codex-mode="light"] {
     --codex-composer-focus-shadow: 0 3px 12px rgba(0, 0, 0, 0.045);
     --codex-scroll-thumb: rgba(15, 23, 42, 0.13);
     --codex-scroll-thumb-hover: rgba(15, 23, 42, 0.26);
-    --codex-font-smoothing: antialiased;
+    --codex-font-smoothing: auto;
 }
 
 /* 1B. 深色模式配色令牌 (Codex Dark Exact Tokens) */
@@ -154,13 +154,13 @@ body.theme-dark {
     --vscode-sideBar-background: var(--codex-sidebar) !important;
     --vscode-titleBar-activeBackground: var(--codex-titlebar-solid) !important;
 
-    /* 对齐 Codex 原厂 42rem (672px) 黄金列宽 */
-    --max-conversation-width: 672px !important;
+    /* 统一 720px 黄金列宽，由原生容器同步约束正文与底部输入框 100% 齐边 */
+    --max-conversation-width: 720px !important;
 
-    /* 对齐 Codex 原厂字体栈与 antialiased 平滑抗锯齿（去掉压窄粘连的 Microsoft YaHei UI） */
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif !important;
+    /* Windows 原生清晰字体栈（标准 Microsoft YaHei，告别压窄的 YaHei UI 与发虚的 optimizeLegibility） */
+    font-family: "Segoe UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif !important;
     -webkit-font-smoothing: var(--codex-font-smoothing) !important;
-    text-rendering: optimizeLegibility !important;
+    text-rendering: auto !important;
     font-weight: 400 !important;
     color: var(--codex-text) !important;
 }
@@ -170,7 +170,7 @@ body.theme-dark {
     background-color: var(--codex-titlebar-solid) !important;
     background-image: var(--codex-titlebar-bg) !important;
     border-bottom: none !important;
-    font-size: 12.5px !important;
+    font-size: 13px !important;
     color: var(--codex-titlebar-fg) !important;
 }
 
@@ -197,9 +197,9 @@ aside {
     box-shadow: 0 2px 4px -2px var(--codex-sidebar) !important;
 }
 
-/* 会话列表行：13px 清秀舒展字体 + 31px 轻盈行高 */
+/* 会话列表行：14px 清晰舒展字体 + 33px 轻盈行高（对齐 Codex 左栏实际大小） */
 [data-testid="conversation-row-sidebar"] {
-    min-height: 31px !important;
+    min-height: 33px !important;
     padding: 5px 10px !important;
     border-radius: 8px !important;
     margin-bottom: 2px !important;
@@ -208,10 +208,10 @@ aside {
 
 [data-testid="conversation-row-sidebar"] span.truncate,
 [data-testid="conversation-row-sidebar"] .truncate {
-    font-size: 13px !important;
-    line-height: 20px !important;
+    font-size: 14px !important;
+    line-height: 21px !important;
     font-weight: 400 !important;
-    letter-spacing: 0.01em !important;
+    letter-spacing: 0px !important;
     color: var(--codex-text-row) !important;
 }
 
@@ -246,7 +246,7 @@ aside {
 [data-testid="section-header"],
 [data-testid="pinned-section-header"],
 [data-testid="conversation-list-sidebar"] [class*="text-xs"] {
-    font-size: 11.5px !important;
+    font-size: 12px !important;
     font-weight: 400 !important;
     letter-spacing: 0.2px !important;
     color: var(--codex-text-muted) !important;
@@ -255,15 +255,15 @@ aside {
 /* 项目折叠标题 */
 [data-testid="project-header"],
 [data-testid="conversation-list-sidebar"] .text-sm {
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     font-weight: 400 !important;
     color: var(--codex-text-row) !important;
 }
 
 /* 侧边栏折叠控制按钮 */
 [data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button) {
-    font-size: 12px !important;
-    line-height: 18px !important;
+    font-size: 12.5px !important;
+    line-height: 19px !important;
     color: var(--codex-text-muted) !important;
     padding-top: 4px !important;
     padding-bottom: 4px !important;
@@ -276,8 +276,8 @@ aside {
 [data-testid="automations-button"],
 [data-testid="settings-button"],
 [data-testid="sidebar-navigation-items"] button {
-    min-height: 31px !important;
-    font-size: 13px !important;
+    min-height: 33px !important;
+    font-size: 14px !important;
     font-weight: 400 !important;
     padding: 5px 10px !important;
     gap: 8px !important;
@@ -323,9 +323,9 @@ main,
     background-color: var(--codex-bg) !important;
 }
 
-/* 约束正文最大阅读宽度至 672px (Codex 42rem)，与底部输入框 100% 齐边 */
+/* 约束正文最大阅读宽度至 720px，与底部输入框 100% 齐边 */
 [data-testid="autoscroll-viewport"] > div {
-    max-width: 672px !important;
+    max-width: 720px !important;
     margin-left: auto !important;
     margin-right: auto !important;
     width: 100% !important;
@@ -402,14 +402,14 @@ main,
     overflow: visible !important;
 }
 
-/* 提问文字：14px 轻盈清晰 */
+/* 提问文字：15px 饱满清晰 */
 [data-testid="user-input-step"] [data-quotable="true"],
 [data-testid="user-input-step"] .whitespace-pre-wrap,
 [data-testid="user-input-step"] p,
 [data-testid="user-message-content"] {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif !important;
-    font-size: 14px !important;
-    line-height: 1.58 !important;
+    font-family: "Segoe UI", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
     color: var(--codex-bubble-fg) !important;
     font-weight: 400 !important;
 }
@@ -445,17 +445,17 @@ main,
     white-space: nowrap !important;
 }
 
-/* 6. AI 回答正文区域 (Assistant Response) - 1:1 对齐 Codex 原厂 14px / 1.65 呼吸感排版 */
+/* 6. AI 回答正文区域 (Assistant Response) - 15.5px / 1.7 舒适饱满呼吸感排版 */
 [data-testid="conversation-view"] p,
 [data-testid="planner-response-text"] p,
 .prose p {
-    font-size: 14px !important;
-    line-height: 1.68 !important;
+    font-size: 15.5px !important;
+    line-height: 1.7 !important;
     color: var(--codex-text) !important;
     margin-top: 0 !important;
     margin-bottom: 12px !important;
     font-weight: 400 !important;
-    letter-spacing: 0.005em !important;
+    letter-spacing: 0px !important;
 }
 
 [data-testid="conversation-view"] ul,
@@ -466,7 +466,7 @@ main,
     padding-left: 1.35rem !important;
     margin-top: 4px !important;
     margin-bottom: 12px !important;
-    font-size: 14px !important;
+    font-size: 15.5px !important;
     font-weight: 400 !important;
     color: var(--codex-text) !important;
 }
@@ -479,7 +479,7 @@ main,
     padding-left: 1.35rem !important;
     margin-top: 4px !important;
     margin-bottom: 12px !important;
-    font-size: 14px !important;
+    font-size: 15.5px !important;
     font-weight: 400 !important;
     color: var(--codex-text) !important;
 }
@@ -487,10 +487,10 @@ main,
 [data-testid="conversation-view"] li,
 [data-testid="planner-response-text"] li,
 .prose li {
-    font-size: 14px !important;
-    line-height: 1.68 !important;
+    font-size: 15.5px !important;
+    line-height: 1.7 !important;
     color: var(--codex-text) !important;
-    margin-bottom: 5px !important;
+    margin-bottom: 6px !important;
     padding-left: 3px !important;
     font-weight: 400 !important;
 }
@@ -504,7 +504,7 @@ main,
 /* 标题层次 */
 [data-testid="conversation-view"] h1,
 .prose h1 {
-    font-size: 17px !important;
+    font-size: 19px !important;
     line-height: 1.45 !important;
     font-weight: 600 !important;
     color: var(--codex-text) !important;
@@ -513,7 +513,7 @@ main,
 }
 [data-testid="conversation-view"] h2,
 .prose h2 {
-    font-size: 15.5px !important;
+    font-size: 17px !important;
     line-height: 1.45 !important;
     font-weight: 600 !important;
     color: var(--codex-text) !important;
@@ -522,7 +522,7 @@ main,
 }
 [data-testid="conversation-view"] h3,
 .prose h3 {
-    font-size: 14.5px !important;
+    font-size: 16px !important;
     line-height: 1.5 !important;
     font-weight: 600 !important;
     color: var(--codex-text) !important;
@@ -531,7 +531,7 @@ main,
 }
 [data-testid="conversation-view"] h4,
 .prose h4 {
-    font-size: 14px !important;
+    font-size: 15.5px !important;
     line-height: 1.5 !important;
     font-weight: 600 !important;
     color: var(--codex-text) !important;
@@ -582,10 +582,10 @@ main,
 [data-testid="planner-response-text"] code:not(pre code),
 .prose code:not(pre code) {
     font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace !important;
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     background-color: var(--codex-code-inline-bg) !important;
     color: var(--codex-text) !important;
-    padding: 1.5px 5.5px !important;
+    padding: 1.5px 6px !important;
     border-radius: 5px !important;
     border: none !important;
     box-shadow: none !important;
@@ -604,7 +604,7 @@ main,
     box-shadow: none !important;
     margin-top: 8px !important;
     margin-bottom: 12px !important;
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     line-height: 1.6 !important;
 }
 
@@ -680,26 +680,22 @@ button:has(> [class*="tabular-nums"]) {
     color: var(--codex-text-subtle) !important;
 }
 
-/* 10. 底部输入框区域 (Agent Input Box) - 672px 同宽齐边、极淡边框轻盈浮片 */
+/* 10. 底部输入框区域 (Agent Input Box) - 跟随原生 --max-conversation-width (720px) 严格同宽齐边 */
 [data-testid="agent-input-box"] {
     background-color: transparent !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     padding: 0 !important;
-    max-width: 672px !important;
-    width: 100% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
 }
 
 #antigravity\.agentSidePanelInputBox.surface-composer,
 [data-testid="agent-input-box"] .surface-composer {
     background-color: var(--codex-composer-bg) !important;
     border: 1px solid var(--codex-composer-border) !important;
-    border-radius: 20px !important;
+    border-radius: 22px !important;
     box-shadow: var(--codex-composer-shadow) !important;
-    padding: 3px 6px !important;
+    padding: 4px 6px !important;
     transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
@@ -712,16 +708,16 @@ button:has(> [class*="tabular-nums"]) {
 [data-testid="agent-input-box"] .surface-composer-card {
     background-color: transparent !important;
     border: none !important;
-    border-radius: 18px !important;
+    border-radius: 20px !important;
     box-shadow: none !important;
-    padding: 5px 8px 3px !important;
+    padding: 6px 8px 4px !important;
 }
 
 [data-testid="agent-input-box"] [contenteditable="true"],
 [data-testid="agent-input-box"] textarea,
 [data-testid="agent-input-box"] input {
-    min-height: 38px !important;
-    font-size: 14px !important;
+    min-height: 42px !important;
+    font-size: 15px !important;
     line-height: 1.55 !important;
     color: var(--codex-text) !important;
     font-weight: 400 !important;
