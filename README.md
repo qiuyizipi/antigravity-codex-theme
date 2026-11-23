@@ -16,10 +16,10 @@
 
 ---
 
-## 核心特性（v4.1 Light & Dark 双色镜像）
+## 核心特性（v4.2 Light & Dark 双色镜像）
 
-1. 浅色 / 深色 / 跟随系统实时无缝切换
-- 所有颜色全面变量化（`--codex-*`），内置轻量级 `MutationObserver` 与系统主题监听，在 Antigravity 设置中切换浅色/深色/跟随系统时毫秒级联动，彻底杜绝黑底黑字或白块错乱。
+1. 浅色 / 深色 / 跟随系统实时无缝切换与切号自愈
+- 所有颜色全面变量化（`--codex-*`），内置轻量级 `MutationObserver`、系统主题监听与 `<head>` 样式置底守护，切换浅色/深色/跟随系统或切换账号时毫秒级同步，并自动联动 Windows 原生右上角窗口控制按钮底色（`titleBarOverlay`），杜绝黑块、白块错乱与样式丢失。
 - 浅色模式还原 OpenAI Codex Light（薄荷云母顶栏、冰白侧边栏 `#F7FAFA`、纯白无缝画布 `#FFFFFF`、深墨字 `#0D0D0D`）。
 - 深色模式还原 OpenAI Codex Dark（`#212121` 深灰主画布、`#181818` 哑光侧边栏与顶栏、`#2A2A2A` 单层输入框、`#171717` 代码块、`#ECECEC` 柔白字）。
 
@@ -46,7 +46,7 @@
 - 若检测到新版脚本，会先通过 `vm.Script` 语法校验再替换，并自动无缝切换至新版继续执行；若处于离线或无法访问 GitHub 状态，自动降级使用本地文件完成安装（也支持加 `--no-update` 跳过联网检查）。
 
 6. 一键联动最新中文汉化
-- 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.0 主题。
+- 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.2 主题。
 - 客户端升级后只需双击一次即可同时完成“最新中文汉化 + Codex 主题”全套部署。
 
 ---
@@ -110,7 +110,7 @@ antigravity-codex-theme/
 ├── install.sh                       # macOS / Linux 安装入口（支持 --with-cn）
 ├── uninstall.sh                     # macOS / Linux 还原入口
 ├── patch_theme.js                   # 零依赖 Node.js 原地无损 ASAR 注入与校验引擎
-├── codex_theme.css                  # v4.0 全屏镜像 Codex 样式表
+├── codex_theme.css                  # v4.2 Light & Dark 双色 Codex 样式表
 ├── showimg/preview.png              # 实机效果截图
 ├── LICENSE                          # MIT 开源协议
 └── README.md                        # 说明文档
