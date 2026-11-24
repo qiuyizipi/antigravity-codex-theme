@@ -1,9 +1,8 @@
 const sidecar = window.sidecar;
-const HOST_CONV_ID = new URLSearchParams(window.location.search).get('conversationId') || '';
 
 const state = {
-  autoFollow: true,
-  selectedConvId: '',
+  pushedConvId: '',
+  activeConvId: '',
   latestData: null,
   lastPollClientMs: Date.now(),
   lastStagesKey: '',
@@ -13,6 +12,22 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+function getCurrentConvId() {
+  return String(
+    state.pushedConvId ||
+      window.sidecar?.conversationId ||
+      new URLSearchParams(window.location.search).get('conversationId') ||
+      ''
+  ).trim();
+}
+
+function resetForConversationSwitch(nextConvId) {
+  state.activeConvId = nextConvId;
+  state.latestData = null;
+  state.lastStagesKey = '';
+  state.lastFeedKey = '';
+}
 
 function applyThemeClass() {
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
@@ -34,6 +49,13 @@ function applyThemeClass() {
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'theme-change') {
     setTimeout(applyThemeClass, 10);
+  } else if (event.data?.type === 'conversation-change') {
+    const nextId = String(event.data?.payload?.conversationId || '').trim();
+    if (nextId !== state.pushedConvId) {
+      state.pushedConvId = nextId;
+      resetForConversationSwitch(nextId);
+      pollStatus();
+    }
   }
 });
 
@@ -77,28 +99,26 @@ async function apiFetch(path, options = {}) {
   });
 }
 
-function renderConversations(conversations, activeId) {
-  const sel = $('conv-select');
-  if (!sel) return;
-  const activeItem = conversations.find((c) => c.id === activeId);
-  const autoLabel = HOST_CONV_ID
-    ? (activeItem ? `当前 · ${activeItem.title}` : '锁定当前会话')
-    : (activeItem ? `自动 · ${activeItem.title}` : '自动跟随活跃会话');
-  const modeKey = state.autoFollow ? '__auto__' : activeId;
-  const key = conversations.map((c) => `${c.id}:${c.title}`).join('|') + `|${modeKey}|${autoLabel}`;
-  if (sel.dataset.key === key) return;
-  sel.dataset.key = key;
-
-  const autoOption = `<option value="__auto__" ${state.autoFollow ? 'selected' : ''}>${escapeHtml(autoLabel)}</option>`;
-  const options = conversations
-    .map((c) => `<option value="${escapeHtml(c.id)}" ${!state.autoFollow && c.id === activeId ? 'selected' : ''}>${escapeHtml(c.title)}</option>`)
-    .join('');
-  sel.innerHTML = autoOption + options;
+function renderConvBadge(convId) {
+  const badge = $('conv-badge');
+  if (!badge) return;
+  if (convId) {
+    badge.textContent = `#${convId.slice(0, 8)}`;
+    badge.title = `当前仅追踪此对话：${convId}`;
+  } else {
+    badge.textContent = '未绑定';
+    badge.title = '等待 Antigravity 传入当前对话 ID';
+  }
 }
 
 function renderLiveClocks() {
   const data = state.latestData;
-  if (!data || !data.found) return;
+  if (!data || !data.found) {
+    $('metric-elapsed').textContent = '00:00';
+    $('metric-stage-elapsed').textContent = '等待开始';
+    $('metric-silence').textContent = '待命中';
+    return;
+  }
 
   const extraMs = data.timing?.isRunning ? Math.max(0, Date.now() - state.lastPollClientMs) : 0;
   const turnElapsedMs = (data.timing?.turnElapsedMs || 0) + extraMs;
@@ -166,7 +186,7 @@ function renderThoughtFeed(data) {
   state.lastFeedKey = key;
 
   if (!items.length) {
-    feedEl.innerHTML = '<div class="empty-hint">开始执行长任务后，这里会持续播报每一步在做什么、为什么做。</div>';
+    feedEl.innerHTML = '<div class="empty-hint">开始在当前对话执行长任务后，这里会持续播报每一步在做什么、为什么做。</div>';
     return;
   }
 
@@ -194,10 +214,10 @@ function renderAll(data) {
   state.latestData = data;
   state.lastPollClientMs = Date.now();
 
-  renderConversations(data.conversations || [], data.conversationId || '');
-  $('task-title').textContent = data.taskTitle || '等待新任务…';
+  renderConvBadge(data.conversationId || state.activeConvId);
+  $('task-title').textContent = data.taskTitle || '当前对话暂无任务';
 
-  const level = data.health?.level || 'completed';
+  const level = data.health?.level || 'idle';
   const dot = $('header-dot');
   dot.className = 'pulse-dot';
   if (data.timing?.isRunning) {
@@ -214,6 +234,7 @@ function renderAll(data) {
   $('metric-eta-basis').textContent = data.eta?.basisText || '';
 
   const shortMap = {
+    idle: '待命',
     healthy: '正常',
     slow: '偏慢',
     stuck: '疑似卡住',
@@ -221,7 +242,7 @@ function renderAll(data) {
     completed: '正常',
     error: '出错',
   };
-  $('metric-health-short').textContent = shortMap[level] || '正常';
+  $('metric-health-short').textContent = shortMap[level] || '待命';
 
   const alertBanner = $('alert-banner');
   const nudgeBtn = $('btn-nudge');
@@ -239,7 +260,7 @@ function renderAll(data) {
   $('current-stage-chip').textContent = data.currentStage?.label || '待命中';
   $('current-summary').textContent = data.currentStage?.summary || '等待你的下一条指令…';
 
-  const pct = Number(data.eta?.progressPercent || 0);
+  const pct = data.found ? Number(data.eta?.progressPercent || 0) : 0;
   $('progress-fill').style.width = `${pct}%`;
   $('progress-pct').textContent = `${pct}%`;
 
@@ -267,13 +288,16 @@ async function pollStatus() {
   if (state.polling) return;
   state.polling = true;
   try {
-    const targetConvId = !state.autoFollow && state.selectedConvId
-      ? state.selectedConvId
-      : HOST_CONV_ID;
-    const query = targetConvId ? `?conversationId=${encodeURIComponent(targetConvId)}` : '';
-    const res = await apiFetch(`/api/status${query}`);
+    const convId = getCurrentConvId();
+    if (convId !== state.activeConvId) {
+      resetForConversationSwitch(convId);
+    }
+    const qs = new URLSearchParams({ strict: '1' });
+    if (convId) qs.set('conversationId', convId);
+    const res = await apiFetch(`/api/status?${qs.toString()}`);
     if (!res.ok) return;
     const data = await res.json();
+    if (getCurrentConvId() !== convId) return;
     renderAll(data);
     $('sync-note').textContent = '实时同步中';
   } catch {
@@ -297,19 +321,6 @@ async function updateSettings(patch) {
 }
 
 function bindEvents() {
-  $('conv-select').addEventListener('change', (e) => {
-    const val = e.target.value;
-    if (val === '__auto__' || !val) {
-      state.autoFollow = true;
-      state.selectedConvId = '';
-    } else {
-      state.autoFollow = false;
-      state.selectedConvId = val;
-    }
-    state.lastStagesKey = '';
-    state.lastFeedKey = '';
-    pollStatus();
-  });
 
   $('toggle-thoughts').addEventListener('change', (e) => {
     state.showThoughts = e.target.checked;
@@ -342,7 +353,7 @@ function bindEvents() {
 
   $('btn-nudge').addEventListener('click', async () => {
     const btn = $('btn-nudge');
-    const targetConvId = state.latestData?.conversationId || state.selectedConvId || HOST_CONV_ID;
+    const targetConvId = getCurrentConvId() || state.latestData?.conversationId;
     if (!sidecar?.agent || !targetConvId) return;
     btn.disabled = true;
     btn.textContent = '发送中…';

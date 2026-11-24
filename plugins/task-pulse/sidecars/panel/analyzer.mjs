@@ -80,6 +80,13 @@ export function getDefaultAppDataDir() {
   );
 }
 
+const CONV_ID_RE = /^[a-zA-Z0-9._-]{4,128}$/;
+
+export function isValidConversationId(rawId) {
+  const id = String(rawId || '').trim();
+  return Boolean(id) && !id.includes('..') && CONV_ID_RE.test(id);
+}
+
 export function sanitizeId(rawId) {
   return String(rawId || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 'default';
 }
@@ -1073,35 +1080,69 @@ function evaluateHealth({
   };
 }
 
+export function buildEmptyAnalysis(convId = '', conversations = [], reason = '') {
+  const safeId = isValidConversationId(convId) ? String(convId).trim() : '';
+  return {
+    found: false,
+    conversationId: safeId,
+    conversations,
+    taskTitle: safeId ? '当前对话暂无任务' : '等待进入对话',
+    currentStage: {
+      key: 'idle',
+      label: '待命中',
+      summary: safeId
+        ? '在当前对话发送指令后，这里会独立追踪本对话的阶段与进展。'
+        : '请在当前对话发送一条消息，任务脉搏将自动绑定本对话。',
+    },
+    health: {
+      level: 'idle',
+      label: '待命中',
+      silenceSec: 0,
+      reason: reason || '本对话暂无进行中的任务',
+    },
+    timing: { turnStartMs: 0, turnElapsedMs: 0, stageElapsedMs: 0, lastActivityAtMs: 0, isRunning: false },
+    eta: { status: 'idle', displayText: '—', basisText: '等待本对话任务开始', progressPercent: 0 },
+    explicitPlan: [],
+    stageTimeline: [],
+    thoughtFeed: [],
+  };
+}
+
 export function analyzeConversation({
   conversationId,
   appDataDir = getDefaultAppDataDir(),
   warnThresholdSec = 45,
   stuckThresholdSec = 120,
   nowMs = Date.now(),
+  strict = true,
+  includeConversations = false,
 } = {}) {
-  const conversations = listConversations(appDataDir);
-  const targetId = conversationId || conversations[0]?.id || '';
+  const rawConvId = String(conversationId || '').trim();
+  const validConvId = isValidConversationId(rawConvId) ? rawConvId : '';
+  const conversations = includeConversations ? listConversations(appDataDir) : [];
+
+  if (strict && !validConvId) {
+    return buildEmptyAnalysis('', conversations, rawConvId ? '无效的会话标识' : '');
+  }
+
+  let targetId = validConvId;
+  if (!targetId && !strict) {
+    const fallbackList = includeConversations ? conversations : listConversations(appDataDir, 1);
+    targetId = fallbackList[0]?.id || '';
+  }
 
   if (!targetId) {
-    return {
-      found: false,
-      conversationId: '',
-      conversations: [],
-      taskTitle: '等待新任务',
-      currentStage: { key: 'idle', label: '等待你的任务指令', summary: '发送一条指令后，这里将实时显示阶段与状态。' },
-      health: { level: 'completed', label: '待命中', silenceSec: 0, reason: '暂无进行中的任务' },
-      timing: { turnElapsedMs: 0, stageElapsedMs: 0, lastActivityAtMs: 0, isRunning: false },
-      eta: { status: 'done', displayText: '—', basisText: '等待新任务开始', progressPercent: 0 },
-      stageTimeline: [],
-      thoughtFeed: [],
-    };
+    return buildEmptyAnalysis('', conversations);
   }
 
   const convBrainDir = join(appDataDir, 'brain', targetId);
   const { steps, mtimeMs: transcriptMtimeMs } = readTranscriptLines(convBrainDir);
   const hookPath = join(appDataDir, 'plugin_data', 'task-pulse', 'live', `${sanitizeId(targetId)}.json`);
   const hookState = safeReadJsonFile(hookPath, {});
+
+  if (steps.length === 0 && !hookState.isTurnActive) {
+    return buildEmptyAnalysis(targetId, conversations);
+  }
 
   let lastUserIdx = -1;
   for (let i = steps.length - 1; i >= 0; i--) {
@@ -1116,7 +1157,9 @@ export function analyzeConversation({
 
   // Walk backwards if latest user step is image-only/empty so title never degrades to generic fallback.
   let taskTitle = extractCleanUserTitle(userStep?.content || '', 56);
-  if (taskTitle === '当前会话' && lastUserIdx > 0) {
+  if (steps.length === 0 && hookState.isTurnActive) {
+    taskTitle = '正在启动新任务';
+  } else if (taskTitle === '当前会话' && lastUserIdx > 0) {
     for (let i = lastUserIdx - 1; i >= 0; i--) {
       if (steps[i].source === 'USER_EXPLICIT' || steps[i].type === 'USER_INPUT') {
         const candidate = extractCleanUserTitle(steps[i].content || '', 56);

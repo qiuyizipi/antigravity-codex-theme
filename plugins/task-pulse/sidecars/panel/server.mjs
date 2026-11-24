@@ -8,11 +8,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { analyzeConversation, getDefaultAppDataDir } from './analyzer.mjs';
+import { analyzeConversation, getDefaultAppDataDir, isValidConversationId } from './analyzer.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP_DATA_DIR = getDefaultAppDataDir();
 const SERVER_STARTED_AT = Date.now();
+const NO_CACHE_HEADERS = { 'Cache-Control': 'no-store, no-cache, must-revalidate' };
 
 async function loadSidecarSdk() {
   try {
@@ -109,6 +110,7 @@ function notifyDesktop({ title, message, sound = true }) {
 }
 
 function maybeNotify(analysis, settings) {
+  if (!analysis?.found) return;
   if (!settings.enableNotifications && !settings.enableSound) return;
   const convId = analysis.conversationId;
   const turnStart = analysis.timing?.turnStartMs || 0;
@@ -148,15 +150,23 @@ function readAsset(filename) {
 
 const app = new SidecarApp();
 
-app.page('/', () => new Response(readAsset('index.html'), { contentType: 'text/html; charset=utf-8' }));
-app.page('/app.js', () => new Response(readAsset('app.js'), { contentType: 'application/javascript; charset=utf-8' }));
-app.api('/styles.css', () => new Response(readAsset('styles.css'), { contentType: 'text/css; charset=utf-8' }), 'GET');
+app.page('/', () => new Response(readAsset('index.html'), { contentType: 'text/html; charset=utf-8', headers: NO_CACHE_HEADERS }));
+app.page('/app.js', () => new Response(readAsset('app.js'), { contentType: 'application/javascript; charset=utf-8', headers: NO_CACHE_HEADERS }));
+app.api('/styles.css', () => new Response(readAsset('styles.css'), { contentType: 'text/css; charset=utf-8', headers: NO_CACHE_HEADERS }), 'GET');
 
 app.api('/api/status', (query) => {
   const settings = readSettings();
-  const convId = String(query?.conversationId || process.env.ANTIGRAVITY_CONVERSATION_ID || '').trim();
+  const strict = query?.strict !== '0';
+  const rawQueryConv = String(query?.conversationId || '').trim();
+  let convId = isValidConversationId(rawQueryConv) ? rawQueryConv : '';
+  if (!convId && !strict) {
+    const envConv = String(process.env.ANTIGRAVITY_CONVERSATION_ID || '').trim();
+    if (isValidConversationId(envConv)) convId = envConv;
+  }
   const analysis = analyzeConversation({
     conversationId: convId || undefined,
+    strict,
+    includeConversations: !strict,
     appDataDir: APP_DATA_DIR,
     warnThresholdSec: settings.warnThresholdSec,
     stuckThresholdSec: settings.stuckThresholdSec,
@@ -168,6 +178,7 @@ app.api('/api/status', (query) => {
   }
   return new Response(JSON.stringify({ ...analysis, settings }), {
     contentType: 'application/json; charset=utf-8',
+    headers: NO_CACHE_HEADERS,
   });
 }, 'GET');
 

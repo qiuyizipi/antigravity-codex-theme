@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { analyzeConversation, condenseThinking, extractExplicitPlan } from '../sidecars/panel/analyzer.mjs';
@@ -607,6 +607,124 @@ test('v2.0: image-only latest USER_INPUT falls back to previous readable user ti
     ]);
     const res = analyzeConversation({ conversationId: convId, appDataDir: root, nowMs: baseMs + 6000 });
     assert.equal(res.taskTitle, '帮我优化主题字重');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('analyzeConversation strictly isolates each conversation and never falls back to another session', () => {
+  const root = mkdtempSync(join(tmpdir(), 'task-pulse-isolation-'));
+  try {
+    const baseMs = Date.parse('2026-11-24T12:00:00Z');
+    const dirA = join(root, 'brain', 'conv-aaa-1111');
+    const dirB = join(root, 'brain', 'conv-bbb-2222');
+    const dirC = join(root, 'brain', 'conv-ccc-3333');
+    const dirD = join(root, 'brain', 'conv-ddd-4444');
+    mkdirSync(join(dirA, '.system_generated', 'logs'), { recursive: true });
+    mkdirSync(join(dirB, '.system_generated', 'logs'), { recursive: true });
+    mkdirSync(dirC, { recursive: true });
+    mkdirSync(join(root, 'plugin_data', 'task-pulse', 'live'), { recursive: true });
+
+    writeTranscript(dirA, [
+      {
+        step_index: 0,
+        source: 'USER_EXPLICIT',
+        type: 'USER_INPUT',
+        status: 'DONE',
+        created_at: new Date(baseMs).toISOString(),
+        content: '<USER_REQUEST>对话A正在重构鉴权</USER_REQUEST>',
+      },
+      {
+        step_index: 1,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        created_at: new Date(baseMs + 4000).toISOString(),
+        thinking: '正在排查对话A代码。',
+        tool_calls: [{ name: 'grep_search', args: { query: 'auth' } }],
+      },
+    ]);
+
+    writeTranscript(dirB, [
+      {
+        step_index: 0,
+        source: 'USER_EXPLICIT',
+        type: 'USER_INPUT',
+        status: 'DONE',
+        created_at: new Date(baseMs - 20000).toISOString(),
+        content: '<USER_REQUEST>对话B已完成样式微调</USER_REQUEST>',
+      },
+      {
+        step_index: 1,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        created_at: new Date(baseMs - 10000).toISOString(),
+        content: '对话B已修改完成。',
+      },
+    ]);
+
+    utimesSync(join(dirA, '.system_generated', 'logs', 'transcript.jsonl'), new Date(baseMs + 4000), new Date(baseMs + 4000));
+    utimesSync(join(dirB, '.system_generated', 'logs', 'transcript.jsonl'), new Date(baseMs - 10000), new Date(baseMs - 10000));
+
+    writeFileSync(
+      join(root, 'plugin_data', 'task-pulse', 'live', 'conv-ddd-4444.json'),
+      JSON.stringify({
+        conversationId: 'conv-ddd-4444',
+        isTurnActive: true,
+        activeTurnStartedAt: new Date(baseMs + 5000).toISOString(),
+        lastEventAt: new Date(baseMs + 6000).toISOString(),
+      }),
+      'utf8'
+    );
+
+    const resA = analyzeConversation({ conversationId: 'conv-aaa-1111', appDataDir: root, nowMs: baseMs + 8000 });
+    assert.equal(resA.found, true);
+    assert.equal(resA.conversationId, 'conv-aaa-1111');
+    assert.equal(resA.taskTitle, '对话A正在重构鉴权');
+    assert.equal(resA.timing.isRunning, true);
+    assert.equal(resA.conversations.length, 0);
+
+    const resB = analyzeConversation({ conversationId: 'conv-bbb-2222', appDataDir: root, nowMs: baseMs + 8000 });
+    assert.equal(resB.found, true);
+    assert.equal(resB.conversationId, 'conv-bbb-2222');
+    assert.equal(resB.taskTitle, '对话B已完成样式微调');
+    assert.equal(resB.timing.isRunning, false);
+
+    const resC = analyzeConversation({ conversationId: 'conv-ccc-3333', appDataDir: root, nowMs: baseMs + 8000 });
+    assert.equal(resC.found, false);
+    assert.equal(resC.conversationId, 'conv-ccc-3333');
+    assert.equal(resC.health.level, 'idle');
+    assert.equal(resC.timing.isRunning, false);
+    assert.equal(resC.stageTimeline.length, 0);
+    assert.equal(resC.thoughtFeed.length, 0);
+
+    const resEmptyStrict = analyzeConversation({ conversationId: '', appDataDir: root, nowMs: baseMs + 8000 });
+    assert.equal(resEmptyStrict.found, false);
+    assert.equal(resEmptyStrict.conversationId, '');
+    assert.equal(resEmptyStrict.health.level, 'idle');
+
+    const resInvalidStrict = analyzeConversation({ conversationId: '../etc', appDataDir: root, nowMs: baseMs + 8000 });
+    assert.equal(resInvalidStrict.found, false);
+    assert.equal(resInvalidStrict.conversationId, '');
+    assert.equal(resInvalidStrict.health.level, 'idle');
+
+    const resDebugFallback = analyzeConversation({
+      conversationId: '',
+      appDataDir: root,
+      nowMs: baseMs + 8000,
+      strict: false,
+      includeConversations: true,
+    });
+    assert.equal(resDebugFallback.found, true);
+    assert.equal(resDebugFallback.conversationId, 'conv-aaa-1111');
+    assert.ok(resDebugFallback.conversations.length >= 2);
+
+    const resHookStarting = analyzeConversation({ conversationId: 'conv-ddd-4444', appDataDir: root, nowMs: baseMs + 8000 });
+    assert.equal(resHookStarting.found, true);
+    assert.equal(resHookStarting.conversationId, 'conv-ddd-4444');
+    assert.equal(resHookStarting.taskTitle, '正在启动新任务');
+    assert.equal(resHookStarting.timing.isRunning, true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

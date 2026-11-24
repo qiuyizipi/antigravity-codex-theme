@@ -171,15 +171,16 @@ body {
   min-width: 0;
 }
 
-.conv-select {
-  max-width: 130px;
-  padding: 3px 6px;
-  border-radius: 6px;
+.conv-badge {
+  max-width: 96px;
+  padding: 2px 7px;
+  border-radius: 999px;
   border: 1px solid var(--card-border);
-  background: var(--card-bg);
-  color: var(--fg);
+  background: var(--subtle-bg);
+  color: var(--muted);
   font-size: 11px;
-  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 
@@ -196,7 +197,8 @@ body {
 .health-pill.is-stuck,
 .health-pill.is-error { background: var(--red-soft); color: var(--red); }
 .health-pill.is-waiting_user { background: var(--cyan-soft); color: var(--cyan); }
-.health-pill.is-completed { background: var(--subtle-bg); color: var(--muted); }
+.health-pill.is-completed,
+.health-pill.is-idle { background: var(--subtle-bg); color: var(--muted); }
 
 .task-caption {
   font-size: 12px;
