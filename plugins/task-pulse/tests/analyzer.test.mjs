@@ -729,3 +729,55 @@ test('analyzeConversation strictly isolates each conversation and never falls ba
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('compact display mode caps thoughtFeed items, merges consecutive duplicates, and limits title/thought length', () => {
+  const { root, convId, convDir } = makeTempEnv();
+  try {
+    const baseMs = Date.parse('2026-11-24T13:00:00Z');
+    const longPrompt = '这是一段故意写得非常非常长用于测试任务标题裁剪和信息精简度的用户需求说明文本超出三十个字符限制';
+    const longThinking = '第一步我们要仔细分析这个模块的边界条件，确保不会影响其他无关分支。第二句是冗余的补充说明。';
+    writeTranscript(convDir, [
+      {
+        step_index: 0,
+        source: 'USER_EXPLICIT',
+        type: 'USER_INPUT',
+        status: 'DONE',
+        created_at: new Date(baseMs).toISOString(),
+        content: `<USER_REQUEST>${longPrompt}</USER_REQUEST>`,
+      },
+      // Two consecutive steps with identical headline should collapse into 1 feed entry
+      ...[1, 2].map((idx) => ({
+        step_index: idx,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        created_at: new Date(baseMs + idx * 2000).toISOString(),
+        thinking: longThinking,
+        tool_calls: [{ name: 'read_file', args: { Path: `file${idx}.mjs`, toolSummary: '读取配置' } }],
+      })),
+      // 4 more distinct steps -> total would exceed 4 if not capped
+      ...['修改代码', '静态检查', '整理测试', '复查状态', '更新记忆'].map((sum, idx) => ({
+        step_index: idx + 3,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        created_at: new Date(baseMs + (idx + 3) * 3000).toISOString(),
+        thinking: longThinking,
+        tool_calls: [{ name: 'edit_file', args: { TargetFile: 'a.mjs', toolSummary: sum } }],
+      })),
+    ]);
+
+    const res = analyzeConversation({ conversationId: convId, appDataDir: root, nowMs: baseMs + 30000 });
+    assert.ok(res.taskTitle.length <= 28, `taskTitle length ${res.taskTitle.length} should be <= 28`);
+    assert.ok(res.thoughtFeed.length <= 4, `thoughtFeed count ${res.thoughtFeed.length} should be <= 4`);
+    for (const item of res.thoughtFeed) {
+      assert.ok(item.thought.length <= 42, `thought length ${item.thought.length} should be <= 42`);
+      assert.ok(!item.thought.includes('第二句是冗余'), 'should keep only 1 concise sentence in compact mode');
+    }
+    // Consecutive duplicates were collapsed before slicing last 4
+    const readCountInFeed = res.thoughtFeed.filter((i) => i.headline.includes('读取配置')).length;
+    assert.ok(readCountInFeed <= 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

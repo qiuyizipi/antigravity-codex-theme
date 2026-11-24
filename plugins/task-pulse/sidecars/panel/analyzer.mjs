@@ -20,12 +20,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 export const STAGE_META = {
-  planning: { key: 'planning', label: '方案构思与拆解', defaultDurationSec: 20, weight: 0.7 },
-  research: { key: 'research', label: '排查问题与调研', defaultDurationSec: 28, weight: 1.0 },
-  coding: { key: 'coding', label: '编写与修改代码', defaultDurationSec: 55, weight: 1.5 },
-  testing: { key: 'testing', label: '跑测试与验证', defaultDurationSec: 35, weight: 1.2 },
-  subagents: { key: 'subagents', label: '多代理协同处理', defaultDurationSec: 50, weight: 1.3 },
-  review: { key: 'review', label: '复查与整理结论', defaultDurationSec: 18, weight: 0.6 },
+  planning: { key: 'planning', label: '方案拆解', defaultDurationSec: 20, weight: 0.7 },
+  research: { key: 'research', label: '排查调研', defaultDurationSec: 28, weight: 1.0 },
+  coding: { key: 'coding', label: '修改代码', defaultDurationSec: 55, weight: 1.5 },
+  testing: { key: 'testing', label: '测试验证', defaultDurationSec: 35, weight: 1.2 },
+  subagents: { key: 'subagents', label: '多代理协同', defaultDurationSec: 50, weight: 1.3 },
+  review: { key: 'review', label: '复查收尾', defaultDurationSec: 18, weight: 0.6 },
 };
 
 const TOOL_STAGE_MAP = {
@@ -204,10 +204,11 @@ export function condenseThinking(rawThinking, maxChars = 160) {
   const cleaned = stripTagsAndPaths(rawThinking);
   if (!cleaned) return '';
   const sentences = cleaned
-    .split(/(?<=[。！？.!?])\s+/)
+    .split(/(?<=[。！？!?])\s*|(?<=\.)\s+/)
     .map((s) => s.trim())
     .filter((s) => s.length >= 6);
-  const picked = (sentences.length > 0 ? sentences.slice(0, 2).join(' ') : cleaned).trim();
+  const sentenceLimit = maxChars <= 60 ? 1 : 2;
+  const picked = (sentences.length > 0 ? sentences.slice(0, sentenceLimit).join(' ') : cleaned).trim();
   return truncateClean(picked, maxChars);
 }
 
@@ -346,15 +347,15 @@ function buildChineseActionHeadline(stage, step) {
   const toolCalls = getToolCalls(step);
   if (toolCalls.length === 0) {
     if (step?.type === 'PLANNER_RESPONSE' && step?.content) {
-      return stage.key === 'review' ? '正在复查与整理结论' : '正在整理回复内容';
+      return stage.key === 'review' ? '复查并整理结论' : '整理回复';
     }
-    return '正在思考下一步方案';
+    return '构思下一步';
   }
 
   const focusCall = toolCalls.find((tc) => tc.name === 'update_focus');
   if (focusCall) {
     const focus = String(unwrapArg(focusCall.args?.focus) || '').trim();
-    if (focus && hasChinese(focus)) return focus;
+    if (focus && hasChinese(focus)) return truncateClean(focus, 24);
   }
 
   const zhSummaries = toolCalls
@@ -362,7 +363,7 @@ function buildChineseActionHeadline(stage, step) {
     .filter((s) => Boolean(s) && hasChinese(s));
 
   if (zhSummaries.length > 0) {
-    return `正在${zhSummaries[0].replace(/^正在/, '')}`;
+    return truncateClean(`正在${zhSummaries[0].replace(/^正在/, '')}`, 24);
   }
 
   const readCount = toolCalls.filter((tc) => ['read_file', 'view_file', 'view_file_outline', 'view_code_item', 'mcp_agy-fast_fast_quick_outline', 'mcp_agy-fast_fast_read_slices'].includes(tc.name)).length;
@@ -370,42 +371,42 @@ function buildChineseActionHeadline(stage, step) {
   const editCount = toolCalls.filter((tc) => ['edit_file', 'write_file', 'replace_file_content', 'multi_replace_file_content', 'write_to_file', 'mcp_agy-fast_fast_apply_edits'].includes(tc.name)).length;
   const runCmdCalls = toolCalls.filter((tc) => tc.name === 'run_command' || tc.name === 'mcp_agy-fast_fast_run_checks');
 
-  if (toolCalls.some((tc) => tc.name === 'ask_question')) return '需要你确认关键信息后再继续';
-  if (toolCalls.some((tc) => tc.name === 'search_web' || tc.name === 'read_url_content')) return '正在检索外部资料与相关文档';
-  if (toolCalls.some((tc) => tc.name === 'invoke_subagent' || tc.name === 'manage_subagents' || tc.name === 'swarm' || tc.name === 'run_workflow')) return '正在调度子代理协同推进任务';
-  if (toolCalls.some((tc) => tc.name === 'manage_task')) return '正在查看或管理后台任务状态';
+  if (toolCalls.some((tc) => tc.name === 'ask_question')) return '等待你的确认';
+  if (toolCalls.some((tc) => tc.name === 'search_web' || tc.name === 'read_url_content')) return '检索参考资料';
+  if (toolCalls.some((tc) => tc.name === 'invoke_subagent' || tc.name === 'manage_subagents' || tc.name === 'swarm' || tc.name === 'run_workflow')) return '调度子代理协同';
+  if (toolCalls.some((tc) => tc.name === 'manage_task')) return '查看后台任务';
 
   if (editCount > 0) {
-    return editCount > 1 ? `正在修改 ${editCount} 处代码或配置` : '正在编写或修改核心代码与配置';
+    return editCount > 1 ? `修改 ${editCount} 处文件` : '修改代码与配置';
   }
   if (stage.key === 'testing') {
-    return `正在${stage.label}，确认改动表现`;
+    return stage.label;
   }
   if (runCmdCalls.length > 0 && stage.key === 'research') {
     return readCount > 0
-      ? `正在排查命令状态并核对 ${readCount} 份文件`
-      : '正在执行命令排查日志与运行状态';
+      ? `排查命令并读 ${readCount} 份文件`
+      : '执行命令排查';
   }
   if (readCount > 0) {
-    return readCount > 1 ? `正在并行读取并分析 ${readCount} 份代码与配置` : '正在读取上下文代码与配置';
+    return readCount > 1 ? `读取 ${readCount} 份文件` : '读取参考文件';
   }
   if (searchCount > 0) {
-    return '正在检索代码库定位关键实现';
+    return '检索代码定位';
   }
 
   switch (stage.key) {
     case 'planning':
-      return '正在梳理任务目标与实现方案';
+      return '方案拆解';
     case 'research':
-      return '正在排查上下文逻辑与代码现状';
+      return '排查代码';
     case 'coding':
-      return '正在编写或修改核心代码与配置';
+      return '修改代码';
     case 'subagents':
-      return '正在调度子代理协同推进任务';
+      return '多代理协同';
     case 'review':
-      return '正在复查修改细节并核对结果';
+      return '复查结论';
     default:
-      return '正在推进当前任务';
+      return '推进任务';
   }
 }
 
@@ -887,7 +888,7 @@ function estimateRemainingTime({
     return {
       status: 'done',
       displayText: '已完成',
-      basisText: '当前轮次已结束',
+      basisText: '已结束',
       progressPercent: 100,
     };
   }
@@ -925,8 +926,8 @@ function estimateRemainingTime({
       const stepNum = activeIdx >= 0 ? activeIdx + 1 : 1;
       return {
         status: 'estimating',
-        displayText: `第 ${stepNum}/${explicitPlan.length} 阶段`,
-        basisText: `已完成 ${completedCount}/${explicitPlan.length}，待首阶段完成后估算耗时`,
+        displayText: `第 ${stepNum}/${explicitPlan.length} 步`,
+        basisText: '待首阶段估算',
         progressPercent,
       };
     }
@@ -947,7 +948,7 @@ function estimateRemainingTime({
     return {
       status: 'estimated',
       displayText: formatDurationRangeZh(baseEtaMs * 0.8, baseEtaMs * 1.3),
-      basisText: `按阶段进度推算（已完成 ${completedCount}/${explicitPlan.length} 个阶段）`,
+      basisText: `清单 ${completedCount}/${explicitPlan.length}`,
       progressPercent,
     };
   }
@@ -955,8 +956,8 @@ function estimateRemainingTime({
   if (turnSteps.length <= 2 || turnElapsedMs < 20000) {
     return {
       status: 'estimating',
-      displayText: '执行中…',
-      basisText: '短任务或刚启动，暂不盲猜剩余时长',
+      displayText: '估算中',
+      basisText: '刚启动',
       progressPercent: turnSteps.length <= 1 ? 12 : 25,
     };
   }
@@ -986,7 +987,7 @@ function estimateRemainingTime({
   return {
     status: 'estimated',
     displayText: formatDurationRangeZh(totalEstMs * 0.75, totalEstMs * 1.35),
-    basisText: '按当前阶段与历史同类任务节奏推算',
+    basisText: '按节奏估算',
     progressPercent,
   };
 }
@@ -1009,9 +1010,9 @@ function evaluateHealth({
   if (waitingForUserInput) {
     return {
       level: 'waiting_user',
-      label: '等待你的确认',
+      label: '待确认',
       silenceSec: 0,
-      reason: '需要你回答问题或确认操作后继续',
+      reason: '等待你的确认',
     };
   }
 
@@ -1019,16 +1020,16 @@ function evaluateHealth({
     if (lastStepStatus === 'ERROR' || lastError) {
       return {
         level: 'error',
-        label: '执行遇到错误',
+        label: '出错',
         silenceSec: 0,
-        reason: lastError ? `上一轮执行异常：${lastError.slice(0, 80)}` : '上一轮执行出现错误中断',
+        reason: lastError ? truncateClean(lastError, 48) : '上轮执行中断',
       };
     }
     return {
       level: 'completed',
-      label: '本轮已完成',
+      label: '已完成',
       silenceSec: 0,
-      reason: '任务本轮已结束，等待你的下一条指令',
+      reason: '本轮已结束',
     };
   }
 
@@ -1039,44 +1040,44 @@ function evaluateHealth({
       level: 'stuck',
       label: '疑似卡住（重复打转）',
       silenceSec,
-      reason: '检测到连续多次重复同一操作或连续报错，建议介入检查',
+      reason: '重复操作无新进展，建议检查',
     };
   }
 
   if (silenceSec >= stuckThresholdSec) {
     const what = activeToolLabel
-      ? `正在执行「${activeToolLabel}」`
+      ? activeToolLabel
       : activeTasksCount > 0
-        ? '后台命令任务'
+        ? '后台任务'
         : activeSubagentsCount > 0
-          ? '子代理协同任务'
-          : `阶段「${currentStage?.label || '推理响应'}」`;
+          ? '子代理'
+          : (currentStage?.label || '响应');
     return {
       level: 'stuck',
       label: '疑似卡住',
       silenceSec,
-      reason: `${what}已静默 ${silenceSec} 秒无新进展，可能等待交互或进程挂起`,
+      reason: `${what} 已静默 ${silenceSec}s`,
     };
   }
 
   if (silenceSec >= warnThresholdSec) {
     return {
       level: 'slow',
-      label: '等待响应较久',
+      label: '响应偏慢',
       silenceSec,
-      reason: `正在等待当前步骤返回结果（已静默 ${silenceSec} 秒）`,
+      reason: `已静默 ${silenceSec} 秒`,
     };
   }
 
   return {
     level: 'healthy',
-    label: '正常推进中',
+    label: '推进中',
     silenceSec,
     reason: activeSubagentsCount > 0
-      ? `有 ${activeSubagentsCount} 个子代理正在协同执行`
+      ? `${activeSubagentsCount} 个子代理执行中`
       : activeTasksCount > 0
-        ? '后台任务正在持续输出日志'
-        : '思考与工具执行节奏正常',
+        ? '后台任务输出中'
+        : '节奏正常',
   };
 }
 
@@ -1086,22 +1087,20 @@ export function buildEmptyAnalysis(convId = '', conversations = [], reason = '')
     found: false,
     conversationId: safeId,
     conversations,
-    taskTitle: safeId ? '当前对话暂无任务' : '等待进入对话',
+    taskTitle: safeId ? '暂无任务' : '等待进入对话',
     currentStage: {
       key: 'idle',
-      label: '待命中',
-      summary: safeId
-        ? '在当前对话发送指令后，这里会独立追踪本对话的阶段与进展。'
-        : '请在当前对话发送一条消息，任务脉搏将自动绑定本对话。',
+      label: '待命',
+      summary: safeId ? '发送指令后自动追踪' : '请先在对话中发送消息',
     },
     health: {
       level: 'idle',
-      label: '待命中',
+      label: '待命',
       silenceSec: 0,
-      reason: reason || '本对话暂无进行中的任务',
+      reason: reason || '暂无任务',
     },
     timing: { turnStartMs: 0, turnElapsedMs: 0, stageElapsedMs: 0, lastActivityAtMs: 0, isRunning: false },
-    eta: { status: 'idle', displayText: '—', basisText: '等待本对话任务开始', progressPercent: 0 },
+    eta: { status: 'idle', displayText: '—', basisText: '待开始', progressPercent: 0 },
     explicitPlan: [],
     stageTimeline: [],
     thoughtFeed: [],
@@ -1156,13 +1155,13 @@ export function analyzeConversation({
   const userStep = lastUserIdx >= 0 ? steps[lastUserIdx] : null;
 
   // Walk backwards if latest user step is image-only/empty so title never degrades to generic fallback.
-  let taskTitle = extractCleanUserTitle(userStep?.content || '', 56);
+  let taskTitle = extractCleanUserTitle(userStep?.content || '', 28);
   if (steps.length === 0 && hookState.isTurnActive) {
     taskTitle = '正在启动新任务';
   } else if (taskTitle === '当前会话' && lastUserIdx > 0) {
     for (let i = lastUserIdx - 1; i >= 0; i--) {
       if (steps[i].source === 'USER_EXPLICIT' || steps[i].type === 'USER_INPUT') {
-        const candidate = extractCleanUserTitle(steps[i].content || '', 56);
+        const candidate = extractCleanUserTitle(steps[i].content || '', 28);
         if (candidate && candidate !== '当前会话') {
           taskTitle = candidate;
           break;
@@ -1188,8 +1187,8 @@ export function analyzeConversation({
     const stepMs = parseTimestampMs(step.created_at) || nowMs;
     const stage = detectStageFromStep(step, prevStageKey);
     const headline = buildChineseActionHeadline(stage, step);
-    const contentSnippet = hasChinese(step.content) ? condenseThinking(step.content, 160) : '';
-    const zhThinkingSnippet = hasChinese(step.thinking) ? condenseThinking(step.thinking, 155) : '';
+    const contentSnippet = hasChinese(step.content) ? condenseThinking(step.content, 42) : '';
+    const zhThinkingSnippet = hasChinese(step.thinking) ? condenseThinking(step.thinking, 42) : '';
     const thoughtSnippet = contentSnippet || zhThinkingSnippet;
 
     const lastStage = stageTimeline[stageTimeline.length - 1];
@@ -1217,13 +1216,19 @@ export function analyzeConversation({
     prevStageKey = stage.key;
 
     if (headline || thoughtSnippet) {
-      thoughtFeed.push({
-        id: `thought-${step.step_index ?? i}`,
-        stageLabel: stage.label,
-        headline,
-        thought: thoughtSnippet,
-        timestampMs: stepMs,
-      });
+      const prevFeed = thoughtFeed[thoughtFeed.length - 1];
+      if (prevFeed && prevFeed.headline === headline) {
+        prevFeed.timestampMs = stepMs;
+        if (thoughtSnippet) prevFeed.thought = thoughtSnippet;
+      } else {
+        thoughtFeed.push({
+          id: `thought-${step.step_index ?? i}`,
+          stageLabel: stage.label,
+          headline,
+          thought: thoughtSnippet,
+          timestampMs: stepMs,
+        });
+      }
     }
   }
 
@@ -1274,7 +1279,7 @@ export function analyzeConversation({
 
   const currentStageObj = stageTimeline[stageTimeline.length - 1] || {
     key: 'planning',
-    label: isTurnActive ? '方案构思与启动' : '待命中',
+    label: isTurnActive ? '方案拆解' : '待命',
     elapsedMs: turnElapsedMs,
   };
 
@@ -1395,7 +1400,7 @@ export function analyzeConversation({
     currentStage: {
       key: currentStageObj.key,
       label: currentStageObj.label,
-      summary: latestFeed?.headline || (isTurnActive ? `正在执行「${currentStageObj.label}」` : '本轮任务已结束'),
+      summary: latestFeed?.headline || (isTurnActive ? currentStageObj.label : '本轮已结束'),
     },
     health,
     timing: {
@@ -1408,7 +1413,7 @@ export function analyzeConversation({
     eta,
     contextUsage,
     explicitPlan,
-    stageTimeline: stageTimeline.slice(-6),
-    thoughtFeed: thoughtFeed.slice(-8).reverse(),
+    stageTimeline: stageTimeline.slice(-5),
+    thoughtFeed: thoughtFeed.slice(-4).reverse(),
   };
 }

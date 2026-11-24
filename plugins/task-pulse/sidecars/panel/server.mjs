@@ -38,7 +38,8 @@ const SETTINGS_PATH = join(APP_DATA_DIR, 'plugin_data', 'task-pulse', 'settings.
 const DEFAULT_SETTINGS = {
   warnThresholdSec: 45,
   stuckThresholdSec: 120,
-  showThoughts: true,
+  showThoughts: false,
+  compactDefaultApplied: false,
   enableNotifications: true,
   enableSound: true,
 };
@@ -47,7 +48,11 @@ function readSettings() {
   if (!existsSync(SETTINGS_PATH)) return { ...DEFAULT_SETTINGS };
   try {
     const parsed = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'));
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    const merged = { ...DEFAULT_SETTINGS, ...parsed };
+    if (parsed.compactDefaultApplied !== true) {
+      merged.showThoughts = false;
+    }
+    return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -61,6 +66,7 @@ function saveSettings(patch) {
     warnThresholdSec: Number.isFinite(warnThresholdSec) && warnThresholdSec >= 15 ? warnThresholdSec : current.warnThresholdSec,
     stuckThresholdSec: Number.isFinite(stuckThresholdSec) && stuckThresholdSec >= 30 ? stuckThresholdSec : current.stuckThresholdSec,
     showThoughts: typeof patch.showThoughts === 'boolean' ? patch.showThoughts : current.showThoughts,
+    compactDefaultApplied: true,
     enableNotifications: typeof patch.enableNotifications === 'boolean' ? patch.enableNotifications : current.enableNotifications,
     enableSound: typeof patch.enableSound === 'boolean' ? patch.enableSound : current.enableSound,
   };

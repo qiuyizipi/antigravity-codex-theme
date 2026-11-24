@@ -7,7 +7,7 @@ const state = {
   lastPollClientMs: Date.now(),
   lastStagesKey: '',
   lastFeedKey: '',
-  showThoughts: true,
+  showThoughts: false,
   polling: false,
 };
 
@@ -76,9 +76,9 @@ function formatShortDuration(ms) {
   return remSec > 0 ? `${mins}分${remSec}秒` : `${mins}分钟`;
 }
 
-function formatTimeOfDay(ms) {
+function formatShortTime(ms) {
   if (!ms) return '';
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function escapeHtml(text) {
@@ -115,8 +115,8 @@ function renderLiveClocks() {
   const data = state.latestData;
   if (!data || !data.found) {
     $('metric-elapsed').textContent = '00:00';
-    $('metric-stage-elapsed').textContent = '等待开始';
-    $('metric-silence').textContent = '待命中';
+    $('metric-stage-elapsed').textContent = '待开始';
+    $('metric-silence').textContent = '空闲';
     return;
   }
 
@@ -126,15 +126,15 @@ function renderLiveClocks() {
 
   $('metric-elapsed').textContent = formatClock(turnElapsedMs);
   $('metric-stage-elapsed').textContent = data.timing?.isRunning
-    ? `本阶段 ${formatClock(stageElapsedMs)}`
-    : '本轮已结束';
+    ? `阶段 ${formatClock(stageElapsedMs)}`
+    : '已结束';
 
   const silenceEl = $('metric-silence');
   if (!data.timing?.isRunning) {
-    silenceEl.textContent = data.health?.level === 'waiting_user' ? '等你确认' : '已结束';
+    silenceEl.textContent = data.health?.level === 'waiting_user' ? '待确认' : '已结束';
   } else {
     const liveSilenceSec = (data.health?.silenceSec || 0) + Math.floor(extraMs / 1000);
-    silenceEl.textContent = liveSilenceSec <= 3 ? '刚刚活跃' : `${liveSilenceSec}秒前活跃`;
+    silenceEl.textContent = liveSilenceSec <= 3 ? '刚刚' : `${liveSilenceSec}s前`;
   }
 }
 
@@ -146,14 +146,15 @@ function renderStages(data) {
     ? data.explicitPlan.map((p) => ({ title: p.title, status: p.status, elapsedMs: p.estimatedMs || 0, isEstimate: true }))
     : (data.stageTimeline || []).map((s) => ({ title: s.label, status: s.status, elapsedMs: s.elapsedMs, isEstimate: false }));
 
-  noteEl.textContent = hasExplicit ? '按任务拆解阶段' : '自动归纳阶段';
+  const doneCount = items.filter((it) => it.status === 'done').length;
+  noteEl.textContent = items.length ? `${doneCount}/${items.length}` : '';
 
   const key = JSON.stringify(items);
   if (key === state.lastStagesKey) return;
   state.lastStagesKey = key;
 
   if (!items.length) {
-    listEl.innerHTML = '<div class="empty-hint">暂无阶段记录</div>';
+    listEl.innerHTML = '<div class="empty-hint">暂无阶段</div>';
     return;
   }
 
@@ -163,7 +164,7 @@ function renderStages(data) {
       let durText = '';
       if (item.status === 'active') durText = '进行中';
       else if (item.elapsedMs > 0) durText = item.isEstimate ? `约${formatShortDuration(item.elapsedMs)}` : formatShortDuration(item.elapsedMs);
-      else durText = item.status === 'done' ? '已完成' : '待开始';
+      else durText = item.status === 'done' ? '完成' : '待开始';
 
       return `
         <div class="stage-row is-${escapeHtml(item.status)}">
@@ -186,7 +187,7 @@ function renderThoughtFeed(data) {
   state.lastFeedKey = key;
 
   if (!items.length) {
-    feedEl.innerHTML = '<div class="empty-hint">开始在当前对话执行长任务后，这里会持续播报每一步在做什么、为什么做。</div>';
+    feedEl.innerHTML = '<div class="empty-hint">暂无动态</div>';
     return;
   }
 
@@ -194,15 +195,14 @@ function renderThoughtFeed(data) {
     .map((item) => {
       const thoughtHtml =
         state.showThoughts && item.thought && item.thought !== item.headline
-          ? `<div class="feed-thought">${escapeHtml(item.thought)}</div>`
+          ? `<div class="feed-thought" title="${escapeHtml(item.thought)}">${escapeHtml(item.thought)}</div>`
           : '';
       return `
         <div class="feed-item">
-          <div class="feed-meta">
-            <span>${escapeHtml(item.stageLabel)}</span>
-            <span class="mono">${escapeHtml(formatTimeOfDay(item.timestampMs))}</span>
+          <div class="feed-row">
+            <span class="feed-headline" title="${escapeHtml(item.headline)}">${escapeHtml(item.headline)}</span>
+            <span class="feed-time mono">${escapeHtml(formatShortTime(item.timestampMs))}</span>
           </div>
-          <div class="feed-headline">${escapeHtml(item.headline)}</div>
           ${thoughtHtml}
         </div>
       `;
@@ -215,7 +215,16 @@ function renderAll(data) {
   state.lastPollClientMs = Date.now();
 
   renderConvBadge(data.conversationId || state.activeConvId);
-  $('task-title').textContent = data.taskTitle || '当前对话暂无任务';
+
+  const titleEl = $('task-title');
+  const cpCount = Number(data.contextUsage?.checkpointCount || 0);
+  if (data.found && data.taskTitle) {
+    titleEl.textContent = cpCount > 0 ? `${data.taskTitle}（压缩${cpCount}次）` : data.taskTitle;
+    titleEl.classList.remove('hidden');
+  } else {
+    titleEl.textContent = '';
+    titleEl.classList.add('hidden');
+  }
 
   const level = data.health?.level || 'idle';
   const dot = $('header-dot');
@@ -228,18 +237,18 @@ function renderAll(data) {
 
   const pill = $('health-pill');
   pill.className = `health-pill is-${level}`;
-  pill.textContent = data.health?.label || '待命中';
+  pill.textContent = data.health?.label || '待命';
 
   $('metric-eta').textContent = data.eta?.displayText || '—';
-  $('metric-eta-basis').textContent = data.eta?.basisText || '';
+  $('metric-eta-basis').textContent = data.eta?.basisText || '待开始';
 
   const shortMap = {
     idle: '待命',
     healthy: '正常',
     slow: '偏慢',
-    stuck: '疑似卡住',
-    waiting_user: '等你确认',
-    completed: '正常',
+    stuck: '卡住',
+    waiting_user: '待确认',
+    completed: '完成',
     error: '出错',
   };
   $('metric-health-short').textContent = shortMap[level] || '待命';
@@ -257,20 +266,15 @@ function renderAll(data) {
     alertBanner.className = 'alert-banner hidden';
   }
 
-  $('current-stage-chip').textContent = data.currentStage?.label || '待命中';
-  $('current-summary').textContent = data.currentStage?.summary || '等待你的下一条指令…';
+  $('current-stage-chip').textContent = data.currentStage?.label || '待命';
+  $('current-summary').textContent = data.currentStage?.summary || '发送指令后自动追踪';
 
   const pct = data.found ? Number(data.eta?.progressPercent || 0) : 0;
   $('progress-fill').style.width = `${pct}%`;
   $('progress-pct').textContent = `${pct}%`;
 
-  const cpCount = Number(data.contextUsage?.checkpointCount || 0);
-  if (cpCount > 0 && data.taskTitle) {
-    $('task-title').textContent = `${data.taskTitle}（已压缩 ${cpCount} 次）`;
-  }
-
   if (data.settings) {
-    state.showThoughts = data.settings.showThoughts !== false;
+    state.showThoughts = data.settings.showThoughts === true;
     $('toggle-thoughts').checked = state.showThoughts;
     if ($('toggle-notify')) $('toggle-notify').checked = data.settings.enableNotifications !== false;
     if ($('toggle-sound')) $('toggle-sound').checked = data.settings.enableSound !== false;
@@ -299,9 +303,9 @@ async function pollStatus() {
     const data = await res.json();
     if (getCurrentConvId() !== convId) return;
     renderAll(data);
-    $('sync-note').textContent = '实时同步中';
+    $('sync-note').textContent = '';
   } catch {
-    $('sync-note').textContent = '重连中…';
+    $('sync-note').textContent = '重连中';
   } finally {
     state.polling = false;
   }
