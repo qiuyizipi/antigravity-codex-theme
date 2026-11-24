@@ -132,8 +132,6 @@ body {
 
 .pulse-dot.is-running {
   background: var(--green);
-  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45);
-  animation: tp-pulse 1.8s infinite;
 }
 
 .pulse-dot.is-slow {
@@ -143,19 +141,6 @@ body {
 .pulse-dot.is-stuck,
 .pulse-dot.is-error {
   background: var(--red);
-  animation: tp-pulse-red 1.2s infinite;
-}
-
-@keyframes tp-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); }
-  70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
-}
-
-@keyframes tp-pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
-  70% { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
 .brand-title {

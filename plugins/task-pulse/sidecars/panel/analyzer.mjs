@@ -71,7 +71,9 @@ const TOOL_STAGE_MAP = {
 const DEFAULT_PIPELINE_ORDER = ['research', 'coding', 'testing', 'review'];
 const transcriptCache = new Map();
 const convMetaCache = new Map();
-const MAX_COLD_READ_BYTES = 4 * 1024 * 1024;
+const finishedTaskLogCache = new Map();
+const MAX_COLD_READ_BYTES = 512 * 1024;
+const MAX_CACHED_STEPS = 600;
 
 export function getDefaultAppDataDir() {
   return (
@@ -417,20 +419,64 @@ function readRangeUtf8(fd, offset, length) {
   return buf.subarray(0, n).toString('utf8');
 }
 
-function readTranscriptLines(convBrainDir) {
+export function getConversationFingerprint(conversationId, appDataDir = getDefaultAppDataDir()) {
+  if (!isValidConversationId(conversationId)) return 'invalid';
+  const convBrainDir = join(appDataDir, 'brain', String(conversationId).trim());
+  const compactPath = join(convBrainDir, '.system_generated', 'logs', 'transcript.jsonl');
+  const fullPath = join(convBrainDir, '.system_generated', 'logs', 'transcript_full.jsonl');
+  let logSig = 'none';
+  for (const p of [compactPath, fullPath]) {
+    if (existsSync(p)) {
+      try {
+        const st = statSync(p);
+        logSig = `${st.mtimeMs}:${st.size}`;
+        break;
+      } catch {
+        // Ignore transient stat failure.
+      }
+    }
+  }
+  let tasksSig = '0';
+  const tasksDir = join(convBrainDir, '.system_generated', 'tasks');
+  if (existsSync(tasksDir)) {
+    try {
+      tasksSig = String(statSync(tasksDir).mtimeMs);
+    } catch {
+      // Ignore transient stat failure.
+    }
+  }
+  let taskMdSig = '0';
+  const taskMdPath = join(convBrainDir, 'task.md');
+  if (existsSync(taskMdPath)) {
+    try {
+      taskMdSig = String(statSync(taskMdPath).mtimeMs);
+    } catch {
+      // Ignore transient stat failure.
+    }
+  }
+  return `${logSig}|${tasksSig}|${taskMdSig}`;
+}
+
+export function readTranscriptLines(convBrainDir) {
   const compactPath = join(convBrainDir, '.system_generated', 'logs', 'transcript.jsonl');
   const fullPath = join(convBrainDir, '.system_generated', 'logs', 'transcript_full.jsonl');
 
   const targetPath = existsSync(compactPath) ? compactPath : (existsSync(fullPath) ? fullPath : '');
-  if (!targetPath) return { steps: [], mtimeMs: 0 };
+  if (!targetPath) return { steps: [], mtimeMs: 0, size: 0, checkpointCount: 0, charsSinceCheckpoint: 0 };
 
   const stat = statSync(targetPath);
   const cached = transcriptCache.get(targetPath);
   if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
-    return { steps: cached.steps, mtimeMs: stat.mtimeMs };
+    return {
+      steps: cached.steps,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      checkpointCount: cached.checkpointCount,
+      charsSinceCheckpoint: cached.charsSinceCheckpoint,
+    };
   }
 
-  // Incremental delta read ONLY when file genuinely grew in append-only fashion (verified via head+tail fingerprint).
+  // Incremental delta read for ANY file size when genuinely appended (verified via 256B head + 64B tail fingerprint).
   if (cached && stat.size > cached.size && cached.offset === cached.size && cached.offset > 0) {
     const fd = openSync(targetPath, 'r');
     try {
@@ -447,7 +493,18 @@ function readTranscriptLines(convBrainDir) {
           const trimmed = line.trim();
           if (!trimmed) continue;
           const parsed = safeParseJson(trimmed);
-          if (parsed) cached.steps.push(parsed);
+          if (parsed) {
+            cached.steps.push(parsed);
+            if (parsed.type === 'CHECKPOINT') {
+              cached.checkpointCount += 1;
+              cached.charsSinceCheckpoint = 0;
+            } else {
+              cached.charsSinceCheckpoint += trimmed.length;
+            }
+          }
+        }
+        if (cached.steps.length > 800) {
+          cached.steps = cached.steps.slice(-MAX_CACHED_STEPS);
         }
         const newOffset = stat.size;
         const newTailStart = Math.max(0, newOffset - 64);
@@ -456,20 +513,26 @@ function readTranscriptLines(convBrainDir) {
         cached.mtimeMs = stat.mtimeMs;
         cached.partial = partial;
         cached.tailSig = readRangeUtf8(fd, newTailStart, newOffset - newTailStart);
-        return { steps: cached.steps, mtimeMs: stat.mtimeMs };
+        return {
+          steps: cached.steps,
+          mtimeMs: stat.mtimeMs,
+          size: stat.size,
+          checkpointCount: cached.checkpointCount,
+          charsSinceCheckpoint: cached.charsSinceCheckpoint,
+        };
       }
     } finally {
       closeSync(fd);
     }
   }
 
-  // Cold read (bounded to last 4 MB on huge archives so UI never stalls).
+  // Cold read bounded to last 512 KB, while still capturing head+tail fingerprints so ALL subsequent appends stay incremental.
   const raw = stat.size > MAX_COLD_READ_BYTES
     ? readTailUtf8(targetPath, MAX_COLD_READ_BYTES)
     : readFileSync(targetPath, 'utf8');
   let headSig = '';
   let tailSig = '';
-  if (stat.size > 0 && stat.size <= MAX_COLD_READ_BYTES) {
+  if (stat.size > 0) {
     const fd = openSync(targetPath, 'r');
     try {
       headSig = readRangeUtf8(fd, 0, Math.min(256, stat.size));
@@ -483,31 +546,56 @@ function readTranscriptLines(convBrainDir) {
   const endsWithNewline = raw.endsWith('\n');
   const partial = endsWithNewline ? '' : (lines.pop() || '');
   const steps = [];
+  let checkpointCount = 0;
+  let charsSinceCheckpoint = 0;
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     const parsed = safeParseJson(trimmed);
-    if (parsed) steps.push(parsed);
+    if (parsed) {
+      steps.push(parsed);
+      if (parsed.type === 'CHECKPOINT') {
+        checkpointCount += 1;
+        charsSinceCheckpoint = 0;
+      } else {
+        charsSinceCheckpoint += trimmed.length;
+      }
+    }
   }
   let finalPartial = partial;
   if (partial.trim()) {
-    const parsed = safeParseJson(partial.trim());
+    const pt = partial.trim();
+    const parsed = safeParseJson(pt);
     if (parsed) {
       steps.push(parsed);
+      if (parsed.type === 'CHECKPOINT') {
+        checkpointCount += 1;
+        charsSinceCheckpoint = 0;
+      } else {
+        charsSinceCheckpoint += pt.length;
+      }
       finalPartial = '';
     }
   }
-  const canAppend = stat.size <= MAX_COLD_READ_BYTES;
+  const keptSteps = steps.length > MAX_CACHED_STEPS ? steps.slice(-MAX_CACHED_STEPS) : steps;
   transcriptCache.set(targetPath, {
     mtimeMs: stat.mtimeMs,
     size: stat.size,
-    offset: canAppend ? stat.size : 0,
+    offset: stat.size,
     partial: finalPartial,
     headSig,
     tailSig,
-    steps,
+    steps: keptSteps,
+    checkpointCount,
+    charsSinceCheckpoint,
   });
-  return { steps, mtimeMs: stat.mtimeMs };
+  return {
+    steps: keptSteps,
+    mtimeMs: stat.mtimeMs,
+    size: stat.size,
+    checkpointCount,
+    charsSinceCheckpoint,
+  };
 }
 
 function extractTitleFromTail(logPath, fallbackId) {
@@ -737,6 +825,11 @@ function inspectBackgroundActivity(convBrainDir, nowMs, turnStartMs = 0, steps =
         if (turnStartMs > 0 && stat.mtimeMs < turnStartMs - 30000 && !runningStepTasks.has(taskId)) {
           continue;
         }
+        const sig = `${stat.mtimeMs}:${stat.size}`;
+        const cachedLog = finishedTaskLogCache.get(p);
+        if (cachedLog && cachedLog.sig === sig && cachedLog.finished) {
+          continue;
+        }
         const raw = readTailUtf8(p, 16384);
         const finished =
           raw.includes('Timer fired') ||
@@ -745,7 +838,10 @@ function inspectBackgroundActivity(convBrainDir, nowMs, turnStartMs = 0, steps =
           raw.includes('was canceled') ||
           raw.includes('cancelled') ||
           raw.includes('Task completed');
-        if (!finished) {
+        if (finished) {
+          finishedTaskLogCache.set(p, { sig, finished: true });
+        } else {
+          finishedTaskLogCache.delete(p);
           activeTasks.push({ id: taskId, mtimeMs: stat.mtimeMs });
           if (stat.mtimeMs > latestTaskActivityMs) latestTaskActivityMs = stat.mtimeMs;
         }
@@ -1135,7 +1231,7 @@ export function analyzeConversation({
   }
 
   const convBrainDir = join(appDataDir, 'brain', targetId);
-  const { steps, mtimeMs: transcriptMtimeMs } = readTranscriptLines(convBrainDir);
+  const { steps, mtimeMs: transcriptMtimeMs, checkpointCount, charsSinceCheckpoint } = readTranscriptLines(convBrainDir);
   const hookPath = join(appDataDir, 'plugin_data', 'task-pulse', 'live', `${sanitizeId(targetId)}.json`);
   const hookState = safeReadJsonFile(hookPath, {});
 
@@ -1359,26 +1455,7 @@ export function analyzeConversation({
     );
   }
 
-  // Track compaction count honestly (UI delegates real context % to native bottom monitor).
-  let lastCheckpointIdx = -1;
-  let checkpointCount = 0;
-  for (let i = 0; i < steps.length; i++) {
-    if (steps[i].type === 'CHECKPOINT') {
-      lastCheckpointIdx = i;
-      checkpointCount++;
-    }
-  }
-  const activeContextSteps = steps.slice(lastCheckpointIdx >= 0 ? lastCheckpointIdx : 0);
-  let totalChars = 0;
-  for (const st of activeContextSteps) {
-    if (st.content) totalChars += String(st.content).length;
-    if (Array.isArray(st.tool_calls)) {
-      for (const tc of st.tool_calls) {
-        totalChars += (tc.name || '').length + JSON.stringify(tc.args || {}).length;
-      }
-    }
-  }
-  const estimatedTokens = Math.max(500, Math.round(totalChars / 3.5));
+  const estimatedTokens = Math.max(500, Math.round((charsSinceCheckpoint || 0) / 4));
   const maxContextTokens = 1000000;
   const percentUsed = Math.min(100, Math.max(1, Math.round((estimatedTokens / maxContextTokens) * 100)));
   const contextUsage = {

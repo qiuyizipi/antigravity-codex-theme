@@ -4,11 +4,11 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { analyzeConversation, getDefaultAppDataDir, isValidConversationId } from './analyzer.mjs';
+import { analyzeConversation, getConversationFingerprint, getDefaultAppDataDir, isValidConversationId } from './analyzer.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP_DATA_DIR = getDefaultAppDataDir();
@@ -40,18 +40,32 @@ const DEFAULT_SETTINGS = {
   stuckThresholdSec: 120,
   showThoughts: false,
   compactDefaultApplied: false,
-  enableNotifications: true,
-  enableSound: true,
+  zeroOverheadV21Migrated: false,
+  enableNotifications: false,
+  enableSound: false,
 };
+
+let settingsCache = { mtimeMs: -1, data: null };
+const statusCache = new Map();
 
 function readSettings() {
   if (!existsSync(SETTINGS_PATH)) return { ...DEFAULT_SETTINGS };
   try {
+    const st = statSync(SETTINGS_PATH);
+    if (settingsCache.data && settingsCache.mtimeMs === st.mtimeMs) {
+      return settingsCache.data;
+    }
     const parsed = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'));
     const merged = { ...DEFAULT_SETTINGS, ...parsed };
     if (parsed.compactDefaultApplied !== true) {
       merged.showThoughts = false;
     }
+    if (parsed.zeroOverheadV21Migrated !== true) {
+      merged.showThoughts = false;
+      merged.enableNotifications = false;
+      merged.enableSound = false;
+    }
+    settingsCache = { mtimeMs: st.mtimeMs, data: merged };
     return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -67,6 +81,7 @@ function saveSettings(patch) {
     stuckThresholdSec: Number.isFinite(stuckThresholdSec) && stuckThresholdSec >= 30 ? stuckThresholdSec : current.stuckThresholdSec,
     showThoughts: typeof patch.showThoughts === 'boolean' ? patch.showThoughts : current.showThoughts,
     compactDefaultApplied: true,
+    zeroOverheadV21Migrated: true,
     enableNotifications: typeof patch.enableNotifications === 'boolean' ? patch.enableNotifications : current.enableNotifications,
     enableSound: typeof patch.enableSound === 'boolean' ? patch.enableSound : current.enableSound,
   };
@@ -75,6 +90,8 @@ function saveSettings(patch) {
   }
   mkdirSync(dirname(SETTINGS_PATH), { recursive: true });
   writeFileSync(SETTINGS_PATH, JSON.stringify(next, null, 2), 'utf8');
+  settingsCache = { mtimeMs: -1, data: null };
+  statusCache.clear();
   return next;
 }
 
@@ -169,6 +186,27 @@ app.api('/api/status', (query) => {
     const envConv = String(process.env.ANTIGRAVITY_CONVERSATION_ID || '').trim();
     if (isValidConversationId(envConv)) convId = envConv;
   }
+
+  const settingsSig = `${settings.warnThresholdSec}:${settings.stuckThresholdSec}:${settings.showThoughts}:${settings.enableNotifications}:${settings.enableSound}`;
+  const fp = convId ? getConversationFingerprint(convId, APP_DATA_DIR) : 'no-conv';
+  const etag = `${fp}|${settingsSig}`;
+  const cacheKey = `${strict ? '1' : '0'}:${convId || ''}`;
+  const now = Date.now();
+  const cached = strict ? statusCache.get(cacheKey) : null;
+
+  if (cached && cached.etag === etag && (!cached.isRunning || now - cached.analyzedAtMs < 2500)) {
+    if (query?.etag && query.etag === etag) {
+      return new Response(JSON.stringify({ unchanged: true, etag }), {
+        contentType: 'application/json; charset=utf-8',
+        headers: NO_CACHE_HEADERS,
+      });
+    }
+    return new Response(JSON.stringify({ ...cached.analysis, etag, settings }), {
+      contentType: 'application/json; charset=utf-8',
+      headers: NO_CACHE_HEADERS,
+    });
+  }
+
   const analysis = analyzeConversation({
     conversationId: convId || undefined,
     strict,
@@ -177,12 +215,23 @@ app.api('/api/status', (query) => {
     warnThresholdSec: settings.warnThresholdSec,
     stuckThresholdSec: settings.stuckThresholdSec,
   });
+
+  if (strict) {
+    if (statusCache.size > 32) statusCache.clear();
+    statusCache.set(cacheKey, {
+      etag,
+      isRunning: Boolean(analysis.timing?.isRunning),
+      analyzedAtMs: now,
+      analysis,
+    });
+  }
+
   try {
     maybeNotify(analysis, settings);
   } catch {
     // Non-blocking notification
   }
-  return new Response(JSON.stringify({ ...analysis, settings }), {
+  return new Response(JSON.stringify({ ...analysis, etag, settings }), {
     contentType: 'application/json; charset=utf-8',
     headers: NO_CACHE_HEADERS,
   });

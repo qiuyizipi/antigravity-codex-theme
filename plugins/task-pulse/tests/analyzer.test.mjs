@@ -1,12 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { analyzeConversation, condenseThinking, extractExplicitPlan } from '../sidecars/panel/analyzer.mjs';
-
-const HOOK_SCRIPT = join(import.meta.dirname, '..', 'scripts', 'hook.mjs');
+import {
+  analyzeConversation,
+  condenseThinking,
+  extractExplicitPlan,
+  getConversationFingerprint,
+  readTranscriptLines,
+} from '../sidecars/panel/analyzer.mjs';
 
 function makeTempEnv() {
   const root = mkdtempSync(join(tmpdir(), 'task-pulse-test-'));
@@ -31,45 +34,6 @@ test('condenseThinking strips XML tags, code blocks, and raw file paths', () => 
   assert.ok(!out.includes('/Users/dev'), 'Unix path should be stripped');
   assert.ok(!out.includes('const a = 1'), 'Code fence should be stripped');
   assert.ok(out.includes('auth guard'), 'Readable reasoning should remain');
-});
-
-test('hook.mjs handles lifecycle events and malformed stdin safely', () => {
-  const { root, convId } = makeTempEnv();
-  try {
-    const env = { ...process.env, ANTIGRAVITY_APP_DATA_DIR: root };
-    const out1 = execFileSync(process.execPath, [HOOK_SCRIPT, 'PreInvocation'], {
-      input: JSON.stringify({ conversationId: convId, modelName: 'Gemini 3.8 Flash' }),
-      encoding: 'utf8',
-      env,
-    });
-    assert.equal(out1.trim(), '{}');
-
-    const out2 = execFileSync(process.execPath, [HOOK_SCRIPT, 'PostToolUse'], {
-      input: JSON.stringify({
-        conversationId: convId,
-        stepIdx: 3,
-        toolCall: { name: 'run_command', args: { toolSummary: '跑冒烟测试' } },
-      }),
-      encoding: 'utf8',
-      env,
-    });
-    assert.equal(out2.trim(), '{}');
-
-    const livePath = join(root, 'plugin_data', 'task-pulse', 'live', `${convId}.json`);
-    const live = JSON.parse(readFileSync(livePath, 'utf8'));
-    assert.equal(live.isTurnActive, true);
-    assert.equal(live.lastTool.name, 'run_command');
-    assert.equal(live.lastTool.summary, '跑冒烟测试');
-
-    const badOut = execFileSync(process.execPath, [HOOK_SCRIPT, 'PostToolUse'], {
-      input: '{not-valid-json',
-      encoding: 'utf8',
-      env,
-    });
-    assert.equal(badOut.trim(), '{}');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
 });
 
 test('analyzeConversation classifies stages, computes ETA from task.md, and detects smoke test', () => {
@@ -777,6 +741,66 @@ test('compact display mode caps thoughtFeed items, merges consecutive duplicates
     // Consecutive duplicates were collapsed before slicing last 4
     const readCountInFeed = res.thoughtFeed.filter((i) => i.headline.includes('读取配置')).length;
     assert.ok(readCountInFeed <= 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('readTranscriptLines handles >4MB transcripts incrementally in milliseconds without full re-parse', () => {
+  const { root, convId, convDir } = makeTempEnv();
+  try {
+    const baseMs = Date.parse('2026-11-24T14:00:00Z');
+    const logPath = join(convDir, '.system_generated', 'logs', 'transcript.jsonl');
+    const padContent = 'X'.repeat(420);
+    const bulkLines = [];
+    for (let i = 0; i < 10000; i++) {
+      bulkLines.push(JSON.stringify({
+        step_index: i,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        created_at: new Date(baseMs + i * 10).toISOString(),
+        content: padContent,
+      }));
+    }
+    writeFileSync(logPath, bulkLines.join('\n') + '\n', 'utf8');
+
+    const fp1 = getConversationFingerprint(convId, root);
+    const cold = readTranscriptLines(convDir);
+    assert.ok(cold.size > 4.5 * 1024 * 1024, 'fixture should exceed 4.5 MB');
+    assert.ok(cold.steps.length <= 600, 'cold step cache should be bounded');
+
+    // Append 1 user step + 1 checkpoint step; must use fast delta path rather than re-reading 512KB
+    const newStep1 = JSON.stringify({
+      step_index: 10000,
+      source: 'USER_EXPLICIT',
+      type: 'USER_INPUT',
+      status: 'DONE',
+      created_at: new Date(baseMs + 200000).toISOString(),
+      content: '<USER_REQUEST>验证超大对话增量解析</USER_REQUEST>',
+    });
+    const newStep2 = JSON.stringify({
+      step_index: 10001,
+      source: 'SYSTEM',
+      type: 'CHECKPOINT',
+      status: 'DONE',
+      created_at: new Date(baseMs + 201000).toISOString(),
+      content: 'checkpoint',
+    });
+    appendFileSync(logPath, `${newStep1}\n${newStep2}\n`, 'utf8');
+
+    const fp2 = getConversationFingerprint(convId, root);
+    assert.notEqual(fp1, fp2);
+
+    const t0 = performance.now();
+    const delta = readTranscriptLines(convDir);
+    const deltaElapsedMs = performance.now() - t0;
+
+    assert.ok(deltaElapsedMs < 100, `incremental delta on >4.5MB took ${deltaElapsedMs}ms, expected <100ms`);
+    assert.equal(delta.checkpointCount, 1);
+    const analysis = analyzeConversation({ conversationId: convId, appDataDir: root, nowMs: baseMs + 205000 });
+    assert.equal(analysis.found, true);
+    assert.equal(analysis.taskTitle, '验证超大对话增量解析');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -3,12 +3,15 @@ const sidecar = window.sidecar;
 const state = {
   pushedConvId: '',
   activeConvId: '',
+  etag: '',
   latestData: null,
   lastPollClientMs: Date.now(),
   lastStagesKey: '',
   lastFeedKey: '',
   showThoughts: false,
   polling: false,
+  pollTimer: null,
+  clockTimer: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -22,11 +25,35 @@ function getCurrentConvId() {
   ).trim();
 }
 
+function syncClockTimer() {
+  const shouldRun = Boolean(
+    !document.hidden &&
+      state.latestData?.found &&
+      state.latestData?.timing?.isRunning
+  );
+  if (shouldRun && !state.clockTimer) {
+    state.clockTimer = setInterval(renderLiveClocks, 1000);
+  } else if (!shouldRun && state.clockTimer) {
+    clearInterval(state.clockTimer);
+    state.clockTimer = null;
+  }
+}
+
+function scheduleNextPoll() {
+  clearTimeout(state.pollTimer);
+  state.pollTimer = null;
+  if (document.hidden) return;
+  const isRunning = Boolean(state.latestData?.found && state.latestData?.timing?.isRunning);
+  state.pollTimer = setTimeout(pollStatus, isRunning ? 3000 : 6000);
+}
+
 function resetForConversationSwitch(nextConvId) {
   state.activeConvId = nextConvId;
+  state.etag = '';
   state.latestData = null;
   state.lastStagesKey = '';
   state.lastFeedKey = '';
+  syncClockTimer();
 }
 
 function applyThemeClass() {
@@ -276,20 +303,24 @@ function renderAll(data) {
   if (data.settings) {
     state.showThoughts = data.settings.showThoughts === true;
     $('toggle-thoughts').checked = state.showThoughts;
-    if ($('toggle-notify')) $('toggle-notify').checked = data.settings.enableNotifications !== false;
-    if ($('toggle-sound')) $('toggle-sound').checked = data.settings.enableSound !== false;
+    if ($('toggle-notify')) $('toggle-notify').checked = data.settings.enableNotifications === true;
+    if ($('toggle-sound')) $('toggle-sound').checked = data.settings.enableSound === true;
     document.querySelectorAll('.thresh-btn').forEach((btn) => {
       btn.classList.toggle('active', Number(btn.dataset.sec) === Number(data.settings.stuckThresholdSec));
     });
   }
 
+  state.etag = data.etag || '';
   renderLiveClocks();
   renderStages(data);
   renderThoughtFeed(data);
+  syncClockTimer();
 }
 
 async function pollStatus() {
-  if (state.polling) return;
+  if (state.polling || document.hidden) return;
+  clearTimeout(state.pollTimer);
+  state.pollTimer = null;
   state.polling = true;
   try {
     const convId = getCurrentConvId();
@@ -298,21 +329,29 @@ async function pollStatus() {
     }
     const qs = new URLSearchParams({ strict: '1' });
     if (convId) qs.set('conversationId', convId);
+    if (state.etag) qs.set('etag', state.etag);
     const res = await apiFetch(`/api/status?${qs.toString()}`);
     if (!res.ok) return;
     const data = await res.json();
     if (getCurrentConvId() !== convId) return;
+    if (data.unchanged === true) {
+      $('sync-note').textContent = '';
+      syncClockTimer();
+      return;
+    }
     renderAll(data);
     $('sync-note').textContent = '';
   } catch {
     $('sync-note').textContent = '重连中';
   } finally {
     state.polling = false;
+    scheduleNextPoll();
   }
 }
 
 async function updateSettings(patch) {
   try {
+    state.etag = '';
     await apiFetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -374,10 +413,19 @@ function bindEvents() {
   });
 }
 
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    clearTimeout(state.pollTimer);
+    state.pollTimer = null;
+    syncClockTimer();
+  } else {
+    syncClockTimer();
+    pollStatus();
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   applyThemeClass();
   bindEvents();
   pollStatus();
-  setInterval(pollStatus, 2000);
-  setInterval(renderLiveClocks, 1000);
 });

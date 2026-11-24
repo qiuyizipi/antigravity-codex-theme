@@ -45,7 +45,7 @@
 
 8. 内置双原生右侧栏插件（零外部依赖、不改 `app.asar`、官方更新不丢）
 - **配置总览 (`codex-config-hub`)**：专治 Antigravity 原生界面「全局规则、Skills、MCP、插件入口藏太深、配完不知道有没有生效」痛点。在右侧边栏一屏查看与在线编辑 `AGENTS.md` / `MEMORY.md`（保存即显示字节变更与生效回执）、搜索全部 Skills、查看脱敏 MCP 并测本地端口连通性、浏览已装插件及一键直达底层目录。
-- **任务脉搏 (`task-pulse` v2.0)**：零卡顿长任务监工侧栏。采用增量尾读与首尾指纹校验（75+ 会话毫秒级响应），优先锁定宿主当前会话 ID、接入原生 `update_steps` / `update_focus` 清单、支持 `agy-fast` 等批量工具分类、精准卡住与死循环检测（杜绝空闲子代理误报）以及长任务完成轻提醒。
+- **任务脉搏 (`task-pulse` v2.1)**：零干扰纯只读长任务监工侧栏。0 Hook / 0 规则注入不介入对话链路，支持任意体积大对话增量解析、ETag 零开销缓存、窗口失焦自动休眠、单行紧凑动态与精准卡住/死循环检测。
 - 同时提供 `双击查看全局配置与生效状态.bat`（`node patch_theme.js --doctor`），终端一秒核验全部配置与补丁状态。
 
 ---
@@ -123,7 +123,7 @@ antigravity-codex-theme/
 ├── codex_theme.css                   # v4.6 Solid-Ink Light & Dark 双色 Codex 样式表
 ├── plugins/
 │   ├── codex-config-hub/             # 原生右侧栏「配置总览 (Config Hub)」插件
-│   └── task-pulse/                   # 原生右侧栏「任务脉搏 (Task Pulse v2.0)」插件
+│   └── task-pulse/                   # 原生右侧栏「任务脉搏 (Task Pulse v2.1)」插件
 ├── LICENSE                           # MIT 开源协议
 └── README.md                         # 说明文档
 ```

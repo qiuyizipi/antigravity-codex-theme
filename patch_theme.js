@@ -983,6 +983,14 @@ function installBundledPlugins() {
         const targetDir = path.join(pluginsTargetRoot, pluginId);
         copyDirRecursive(srcDir, targetDir);
 
+        for (const obsoleteRel of ['hooks.json', 'rules', 'scripts']) {
+            const srcObsolete = path.join(srcDir, obsoleteRel);
+            const dstObsolete = path.join(targetDir, obsoleteRel);
+            if (!fs.existsSync(srcObsolete) && fs.existsSync(dstObsolete)) {
+                fs.rmSync(dstObsolete, { recursive: true, force: true });
+            }
+        }
+
         const sidecarJsonPath = path.join(targetDir, 'sidecars', 'panel', 'sidecar.json');
         if (fs.existsSync(sidecarJsonPath)) {
             const sc = JSON.parse(fs.readFileSync(sidecarJsonPath, 'utf8'));
