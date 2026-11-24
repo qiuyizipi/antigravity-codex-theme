@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>任务脉搏 · Task Pulse</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/preload.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <!-- 顶部栏 -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="pulse-dot" id="header-dot"></span>
+        <span class="brand-title">任务脉搏</span>
+      </div>
+      <div class="topbar-actions">
+        <select id="conv-select" class="conv-select" title="切换会话"></select>
+        <span id="health-pill" class="health-pill is-completed">待命中</span>
+      </div>
+    </header>
+
+    <!-- 当前任务标题 -->
+    <section class="task-caption" id="task-title">等待新任务…</section>
+
+    <!-- 三格时间与健康总览 -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">已用时间</div>
+        <div class="metric-value mono" id="metric-elapsed">00:00</div>
+        <div class="metric-sub" id="metric-stage-elapsed">本阶段 00:00</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">预计剩余</div>
+        <div class="metric-value" id="metric-eta">—</div>
+        <div class="metric-sub" id="metric-eta-basis">等待任务开始</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">卡住检测</div>
+        <div class="metric-value" id="metric-health-short">正常</div>
+        <div class="metric-sub" id="metric-silence">活跃中</div>
+      </div>
+    </section>
+
+    <!-- 卡住告警条（仅慢速等待/疑似卡住/出错时显示） -->
+    <section class="alert-banner hidden" id="alert-banner">
+      <div class="alert-body">
+        <div class="alert-title" id="alert-title">疑似卡住</div>
+        <div class="alert-reason" id="alert-reason"></div>
+      </div>
+      <button id="btn-nudge" class="btn-nudge hidden" title="向当前对话发送一条保守的状态检查提示">
+        提醒检查
+      </button>
+    </section>
+
+    <!-- 主卡：现在在干啥（中等粒度） -->
+    <section class="card hero-card">
+      <div class="card-head">
+        <span class="card-kicker">现在在干啥</span>
+        <span class="stage-chip" id="current-stage-chip">待命中</span>
+      </div>
+      <div class="hero-summary" id="current-summary">等待你的下一条指令…</div>
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+        <span class="progress-pct mono" id="progress-pct">0%</span>
+      </div>
+    </section>
+
+    <!-- 阶段里程碑 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="card-kicker">阶段进度</span>
+        <span class="muted-note" id="stage-count-note">自动归纳阶段</span>
+      </div>
+      <div class="stage-list" id="stage-list">
+        <div class="empty-hint">暂无阶段记录</div>
+      </div>
+    </section>
+
+    <!-- DeepSeek 式思路与进展流 -->
+    <section class="card feed-card">
+      <div class="card-head">
+        <span class="card-kicker">思路与进展</span>
+        <label class="toggle-wrap" title="是否显示模型精简思考内容">
+          <input type="checkbox" id="toggle-thoughts" checked />
+          <span>显示思考摘要</span>
+        </label>
+      </div>
+      <div class="thought-feed" id="thought-feed">
+        <div class="empty-hint">开始执行长任务后，这里会持续播报每一步在做什么、为什么做。</div>
+      </div>
+    </section>
+
+    <!-- 底部极简配置条 -->
+    <footer class="footer-bar">
+      <div class="footer-left">
+        <span class="footer-label">卡住</span>
+        <div class="threshold-group" id="threshold-group">
+          <button class="thresh-btn" data-sec="60">60s</button>
+          <button class="thresh-btn active" data-sec="120">120s</button>
+          <button class="thresh-btn" data-sec="180">180s</button>
+        </div>
+      </div>
+      <div class="footer-right">
+        <label class="toggle-pill" title="长任务跑完时桌面弹窗提醒">
+          <input type="checkbox" id="toggle-notify" checked />
+          <span>弹窗</span>
+        </label>
+        <label class="toggle-pill" title="完成或卡住时轻提示音">
+          <input type="checkbox" id="toggle-sound" checked />
+          <span>声音</span>
+        </label>
+        <span class="footer-sync" id="sync-note">同步中</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

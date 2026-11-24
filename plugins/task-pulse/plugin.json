@@ -1,0 +1,11 @@
+{
+  "name": "task-pulse",
+  "displayName": "任务脉搏 (Task Pulse)",
+  "version": "2.0.0",
+  "description": "轻量零卡顿长任务监工侧栏：实时跟踪当前活跃会话阶段、原生 update_steps 清单、耗时与卡住检测、死循环预警与完成轻提醒。",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "打开任务脉搏侧边栏监控当前任务",
+    "查看当前任务阶段、已耗时和是否卡住"
+  ]
+}

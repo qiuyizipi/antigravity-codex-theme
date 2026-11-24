@@ -9,7 +9,8 @@ const { spawnSync, execSync } = require('child_process');
 
 const SCRIPT_DIR = __dirname;
 const CSS_PATH = path.join(SCRIPT_DIR, 'codex_theme.css');
-const CONFIG_HUB_SRC = path.join(SCRIPT_DIR, 'plugins', 'codex-config-hub');
+const PLUGINS_SRC_ROOT = path.join(SCRIPT_DIR, 'plugins');
+const BUNDLED_PLUGINS = ['codex-config-hub', 'task-pulse'];
 const SELF_RAW_BASE = (process.env.CODEX_THEME_RAW_BASE || 'https://raw.githubusercontent.com/qiuyizipi/antigravity-codex-theme/main').replace(/\/+$/, '');
 const CN_REPO_URL = 'https://github.com/Silas-02/antigravity-desktop-cn.git';
 const CN_ZIP_URL = 'https://github.com/Silas-02/antigravity-desktop-cn/archive/refs/heads/main.zip';
@@ -33,12 +34,12 @@ function sleepSync(ms) {
 
 function parseArgs(argv) {
     const opts = {
-        mode: 'install', // install | uninstall | check | doctor | install-hub
+        mode: 'install', // install | uninstall | check | doctor | install-plugins
         withCn: false,
         noKill: false,
         noUpdate: false,
-        noHub: false,
-        removeHub: false,
+        noPlugins: false,
+        removePlugins: false,
         selfUpdated: false,
         watchCss: false,
         brandTitle: 'english',
@@ -49,12 +50,12 @@ function parseArgs(argv) {
         if (a === '--uninstall' || a === '--restore') opts.mode = 'uninstall';
         else if (a === '--check' || a === '--status') opts.mode = 'check';
         else if (a === '--doctor') opts.mode = 'doctor';
-        else if (a === '--install-hub') opts.mode = 'install-hub';
+        else if (a === '--install-plugins' || a === '--install-hub') opts.mode = 'install-plugins';
         else if (a === '--with-cn') opts.withCn = true;
         else if (a === '--no-kill') opts.noKill = true;
         else if (a === '--no-update') opts.noUpdate = true;
-        else if (a === '--no-hub') opts.noHub = true;
-        else if (a === '--remove-hub') opts.removeHub = true;
+        else if (a === '--no-plugins' || a === '--no-hub') opts.noPlugins = true;
+        else if (a === '--remove-plugins' || a === '--remove-hub') opts.removePlugins = true;
         else if (a === '--self-updated') opts.selfUpdated = true;
         else if (a === '--watch-css') opts.watchCss = true;
         else if (a === '--brand-title' && argv[i + 1]) opts.brandTitle = argv[++i];
@@ -940,18 +941,17 @@ function runInstall(opts) {
         throw new Error('最终校验未通过，请检查 app.asar 状态。');
     }
 
-    let hubInstalled = false;
-    if (!opts.noHub && fs.existsSync(CONFIG_HUB_SRC)) {
-        const hubRes = installConfigHubPlugin();
-        hubInstalled = hubRes.installed;
+    let installedPlugins = [];
+    if (!opts.noPlugins && fs.existsSync(PLUGINS_SRC_ROOT)) {
+        installedPlugins = installBundledPlugins();
     }
 
     console.log('\n========================================================');
     console.log('  [OK] 成功！Codex 视觉与排版主题已无损部署到 Antigravity');
     console.log(`       版本: v${info.version} | 体积: ${(stats.finalSize / 1024 / 1024).toFixed(2)} MB | 原生依赖保留: ${stats.unpackedCount} 项`);
     console.log(`       中文汉化: ${info.hasCN ? '已启用' : '未启用'} | Codex 主题: 已启用 | 语法校验: 通过${info.hasHotCssIpc ? ' | IPC热重载: 已启用' : ''}`);
-    if (hubInstalled) {
-        console.log('       右侧栏「配置总览 (Config Hub)」插件: 已同步（重开后可在插件面板打开）');
+    if (installedPlugins.length > 0) {
+        console.log(`       内置原生侧栏插件: ${installedPlugins.map(p => p.id).join(', ')}（重开后可在右侧插件面板启用）`);
     }
     console.log('  请重新打开 Antigravity 即可体验全新界面。');
     console.log('========================================================');
@@ -972,21 +972,27 @@ function copyDirRecursive(srcDir, dstDir) {
     }
 }
 
-function installConfigHubPlugin() {
-    if (!fs.existsSync(CONFIG_HUB_SRC)) {
-        return { installed: false, reason: '仓库内未找到 plugins/codex-config-hub 目录' };
-    }
-    const targetDir = path.join(getGeminiConfigDir(), 'plugins', 'codex-config-hub');
-    copyDirRecursive(CONFIG_HUB_SRC, targetDir);
+function installBundledPlugins() {
+    const installed = [];
+    const nodeCmd = process.platform === 'win32' ? 'node.exe' : 'node';
+    const pluginsTargetRoot = path.join(getGeminiConfigDir(), 'plugins');
 
-    const sidecarJsonPath = path.join(targetDir, 'sidecars', 'panel', 'sidecar.json');
-    if (fs.existsSync(sidecarJsonPath)) {
-        const sc = JSON.parse(fs.readFileSync(sidecarJsonPath, 'utf8'));
-        sc.command = process.platform === 'win32' ? 'node.exe' : 'node';
-        fs.writeFileSync(sidecarJsonPath, JSON.stringify(sc, null, 2) + '\n', 'utf8');
+    for (const pluginId of BUNDLED_PLUGINS) {
+        const srcDir = path.join(PLUGINS_SRC_ROOT, pluginId);
+        if (!fs.existsSync(srcDir)) continue;
+        const targetDir = path.join(pluginsTargetRoot, pluginId);
+        copyDirRecursive(srcDir, targetDir);
+
+        const sidecarJsonPath = path.join(targetDir, 'sidecars', 'panel', 'sidecar.json');
+        if (fs.existsSync(sidecarJsonPath)) {
+            const sc = JSON.parse(fs.readFileSync(sidecarJsonPath, 'utf8'));
+            sc.command = nodeCmd;
+            fs.writeFileSync(sidecarJsonPath, JSON.stringify(sc, null, 2) + '\n', 'utf8');
+        }
+        const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, 'plugin.json'), 'utf8'));
+        installed.push({ id: pluginId, version: manifest.version || '1.0.0', targetDir });
     }
-    JSON.parse(fs.readFileSync(path.join(targetDir, 'plugin.json'), 'utf8'));
-    return { installed: true, targetDir };
+    return installed;
 }
 
 function runDoctor(opts) {
@@ -1086,11 +1092,13 @@ function runUninstall(opts) {
     ensureWritable(detected.asarPath);
     ensureAntigravityClosed(opts.noKill);
 
-    if (opts.removeHub) {
-        const hubDir = path.join(getGeminiConfigDir(), 'plugins', 'codex-config-hub');
-        if (fs.existsSync(hubDir)) {
-            fs.rmSync(hubDir, { recursive: true, force: true });
-            console.log(`[清理] 已移除右侧栏配置总览插件: ${hubDir}`);
+    if (opts.removePlugins) {
+        for (const pluginId of BUNDLED_PLUGINS) {
+            const pDir = path.join(getGeminiConfigDir(), 'plugins', pluginId);
+            if (fs.existsSync(pDir)) {
+                fs.rmSync(pDir, { recursive: true, force: true });
+                console.log(`[清理] 已移除内置原生插件: ${pDir}`);
+            }
         }
     }
 
@@ -1150,11 +1158,13 @@ function main() {
             console.log(JSON.stringify(info, null, 2));
         } else if (opts.mode === 'doctor') {
             runDoctor(opts);
-        } else if (opts.mode === 'install-hub') {
-            const res = installConfigHubPlugin();
-            if (!res.installed) throw new Error(res.reason);
-            console.log(`[OK] 已安装/更新原生右侧栏「配置总览 (Config Hub)」插件：${res.targetDir}`);
-            console.log('     请重启 Antigravity 后在右侧边栏插件列表打开「配置总览」。');
+        } else if (opts.mode === 'install-plugins') {
+            const list = installBundledPlugins();
+            if (list.length === 0) throw new Error('仓库内未找到 plugins/ 目录下的内置插件');
+            for (const p of list) {
+                console.log(`[OK] 已安装/更新原生插件 ${p.id} (v${p.version}) -> ${p.targetDir}`);
+            }
+            console.log('     请重启 Antigravity 后在右侧边栏插件面板启用「配置总览」与「任务脉搏」。');
         } else if (opts.mode === 'uninstall') {
             runUninstall(opts);
         } else {

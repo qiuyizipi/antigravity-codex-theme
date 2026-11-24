@@ -10,13 +10,7 @@
 
 ---
 
-## 效果展示
-
-![Codex 桌面端 1:1 质感实机截图](./showimg/preview.png)
-
----
-
-## 核心特性（v4.6 Solid-Ink 实墨双色版）
+## 核心特性（v4.8 开箱即用套装：Codex 实墨主题 + 双原生侧栏插件）
 
 1. 浅色 / 深色 / 跟随系统实时无缝切换与切号自愈
 - 所有颜色全面变量化（`--codex-*`），同步覆盖 Antigravity 原生 `--foreground` / `--secondary-foreground` / `--muted-foreground` / `--shell` / `--onyx-*` 语义令牌，完整兼容 `body.dark`（`html:has(> body.dark)`）。
@@ -49,9 +43,9 @@
 - 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.6 主题。
 - 客户端升级后只需双击一次即可同时完成“最新中文汉化 + Codex 主题”全套部署。
 
-8. 内置原生右侧栏「配置总览 (Config Hub)」插件 + 一屏体检 `--doctor`
-- 专治 Antigravity 原生界面「全局规则、Skills、MCP、插件入口藏太深、配完不知道有没有生效」痛点。
-- 安装主题时自动部署零依赖原生侧栏插件 `codex-config-hub` 到 `~/.gemini/config/plugins/`（不修改 `app.asar`，随官方更新持久保留），在客户端右侧边栏一屏集中查看与在线编辑 `AGENTS.md` / `MEMORY.md`（保存即显示字节变更与生效回执）、搜索全部 Skills、查看脱敏 MCP 并一键测本地端口连通性、浏览已装插件及一键直达底层目录。
+8. 内置双原生右侧栏插件（零外部依赖、不改 `app.asar`、官方更新不丢）
+- **配置总览 (`codex-config-hub`)**：专治 Antigravity 原生界面「全局规则、Skills、MCP、插件入口藏太深、配完不知道有没有生效」痛点。在右侧边栏一屏查看与在线编辑 `AGENTS.md` / `MEMORY.md`（保存即显示字节变更与生效回执）、搜索全部 Skills、查看脱敏 MCP 并测本地端口连通性、浏览已装插件及一键直达底层目录。
+- **任务脉搏 (`task-pulse` v2.0)**：零卡顿长任务监工侧栏。采用增量尾读与首尾指纹校验（75+ 会话毫秒级响应），优先锁定宿主当前会话 ID、接入原生 `update_steps` / `update_focus` 清单、支持 `agy-fast` 等批量工具分类、精准卡住与死循环检测（杜绝空闲子代理误报）以及长任务完成轻提醒。
 - 同时提供 `双击查看全局配置与生效状态.bat`（`node patch_theme.js --doctor`），终端一秒核验全部配置与补丁状态。
 
 ---
@@ -63,20 +57,20 @@
 ### Windows 用户（推荐）
 1. 下载或克隆本仓库到本地。
 2. 按需选择以下脚本双击运行（脚本会自动识别常见安装路径并关闭残留客户端进程）：
-   - 仅安装 Codex 主题 + 配置总览侧栏插件：双击 `双击安装Codex主题.bat`
-   - 一键同步最新中文汉化 + 安装 Codex 主题 + 配置总览侧栏插件：双击 `双击一键汉化并安装Codex主题.bat`
+   - 仅安装 Codex 主题 + 双原生侧栏插件：双击 `双击安装Codex主题.bat`
+   - 一键同步最新中文汉化 + 安装 Codex 主题 + 双原生侧栏插件：双击 `双击一键汉化并安装Codex主题.bat`
    - 随时一屏核验全局规则 / Skills / MCP / 插件 / 补丁生效状态：双击 `双击查看全局配置与生效状态.bat`
    - 若安装在非默认目录未能自动识别：直接将 Antigravity 安装目录或 `Antigravity.exe` 拖拽到 `.bat` 脚本图标上即可；若装在 `C:\Program Files`，请右键「以管理员身份运行」。
-3. 提示 `[OK] 成功` 后，重新打开 Antigravity 即可（在右侧边栏插件入口即可打开「配置总览」）。
+3. 提示 `[OK] 成功` 后，重新打开 Antigravity 即可（在右侧边栏插件入口即可打开「配置总览」与「任务脉搏」）。
 
 ### macOS / Linux 用户
 ```bash
 chmod +x install.sh uninstall.sh
 
-# 仅安装 Codex 主题 + 配置总览插件
+# 仅安装 Codex 主题 + 双原生侧栏插件
 ./install.sh
 
-# 一键联动最新中文汉化 + Codex 主题 + 配置总览插件
+# 一键联动最新中文汉化 + Codex 主题 + 双原生侧栏插件
 ./install.sh --with-cn
 
 # 一屏体检全部全局配置与生效状态
@@ -91,16 +85,16 @@ node patch_theme.js --check
 # 一屏体检客户端补丁、全局规则、Skills、MCP 与原生插件状态
 node patch_theme.js --doctor
 
-# 仅单独安装/更新右侧栏「配置总览」原生插件
-node patch_theme.js --install-hub
+# 仅单独安装/更新右侧栏双原生插件（codex-config-hub + task-pulse）
+node patch_theme.js --install-plugins
 
-# 联动汉化并叠加主题（可选 --no-kill 不关闭客户端，--no-update 跳过联网检查，--no-hub 不装侧栏插件）
+# 联动汉化并叠加主题（可选 --no-kill 不关闭客户端，--no-update 跳过联网检查，--no-plugins 不装侧栏插件）
 node patch_theme.js --with-cn --no-kill --no-update
 
-# 仅安装主题（自动附带配置总览插件）
+# 仅安装主题（自动附带双原生侧栏插件）
 node patch_theme.js
 
-# 恢复原版主题（附加 --remove-hub 可同时移除配置总览插件）
+# 恢复原版主题（附加 --remove-plugins 可同时移除内置双插件）
 node patch_theme.js --uninstall
 ```
 
@@ -119,16 +113,17 @@ node patch_theme.js --uninstall
 
 ```text
 antigravity-codex-theme/
-├── 双击一键汉化并安装Codex主题.bat   # Windows 一键联动汉化 + Codex 主题 + 配置总览插件
-├── 双击安装Codex主题.bat             # Windows 双击安装 Codex 主题 + 配置总览插件
+├── 双击一键汉化并安装Codex主题.bat   # Windows 一键联动汉化 + Codex 主题 + 双侧栏插件
+├── 双击安装Codex主题.bat             # Windows 双击安装 Codex 主题 + 双侧栏插件
 ├── 双击查看全局配置与生效状态.bat    # Windows 一屏体检规则/Skills/MCP/插件生效状态
 ├── 双击恢复原版主题.bat              # Windows 双击一键还原
 ├── install.sh                        # macOS / Linux 安装入口（支持 --with-cn）
 ├── uninstall.sh                      # macOS / Linux 还原入口
 ├── patch_theme.js                    # 零依赖 Node.js 原地无损 ASAR 注入、插件部署与体检引擎
 ├── codex_theme.css                   # v4.6 Solid-Ink Light & Dark 双色 Codex 样式表
-├── plugins/codex-config-hub/         # 内置零依赖原生右侧栏「配置总览 (Config Hub)」插件
-├── showimg/preview.png               # 实机效果截图
+├── plugins/
+│   ├── codex-config-hub/             # 原生右侧栏「配置总览 (Config Hub)」插件
+│   └── task-pulse/                   # 原生右侧栏「任务脉搏 (Task Pulse v2.0)」插件
 ├── LICENSE                           # MIT 开源协议
 └── README.md                         # 说明文档
 ```
@@ -138,4 +133,4 @@ antigravity-codex-theme/
 ## 致谢与声明
 
 - 中文汉化能力通过一键脚本在线联动 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 实现，本仓库不直接分发第三方汉化源码，版权归原作者所有。
-- 本仓库内的 Codex 视觉主题样式表（`codex_theme.css`）、原地无损 ASAR 注入引擎（`patch_theme.js`）与原生配置总览侧栏插件（`plugins/codex-config-hub/`）均采用 MIT 协议开源。
+- 本仓库内的 Codex 视觉主题样式表（`codex_theme.css`）、原地无损 ASAR 注入引擎（`patch_theme.js`）与内置原生侧栏插件（`plugins/codex-config-hub/`、`plugins/task-pulse/`）均采用 MIT 协议开源。
