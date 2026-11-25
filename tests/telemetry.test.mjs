@@ -217,6 +217,74 @@ test('generated main & preload telemetry scripts pass vm.Script syntax validatio
     assert.ok(preloadScript.includes('btn-reset-pos'));
     assert.ok(preloadScript.includes('ctx-ring-arc'));
     assert.ok(preloadScript.includes('docListenersBound'));
+    assert.ok(preloadScript.includes('quota-active-windows'));
+    assert.ok(mainNoWatch.includes('forceRefresh'));
+});
+
+test('normalizeQuotaSnapshot unwraps RetrieveUserQuotaSummary.response with both 5h and weekly windows', () => {
+    const rpcWrapped = {
+        response: {
+            groups: [
+                {
+                    displayName: 'Gemini 4',
+                    buckets: [
+                        {
+                            bucketId: 'g4_weekly',
+                            displayName: 'Weekly limit',
+                            refreshWindowLabel: 'Weekly',
+                            remainingFraction: 0.62,
+                            resetTime: '2026-11-30T00:00:00Z',
+                        },
+                        {
+                            bucketId: 'g4_5h',
+                            displayName: '5-hour limit',
+                            refreshWindowLabel: '5 hours',
+                            remainingFraction: 0.9,
+                            resetTime: '2026-11-25T16:00:00Z',
+                        },
+                    ],
+                },
+                {
+                    displayName: 'Claude',
+                    buckets: [
+                        {
+                            bucketId: 'claude_5h',
+                            refreshWindowLabel: '5-hour',
+                            remainingFraction: 1,
+                            resetTime: '2026-11-25T16:00:00Z',
+                        },
+                        {
+                            bucketId: 'claude_weekly',
+                            refreshWindowLabel: '7d',
+                            remainingFraction: 0.85,
+                            resetTime: '2026-11-30T00:00:00Z',
+                        },
+                    ],
+                },
+            ],
+        },
+    };
+    const snap = telemetry.normalizeQuotaSnapshot({}, rpcWrapped, 'Gemini 4 Neon');
+    assert.equal(snap.ok, true);
+    assert.equal(snap.activeQuota.label, 'Gemini 4');
+    assert.equal(snap.activeWindows.length, 2);
+    assert.deepEqual(snap.activeWindows.map((w) => w.windowLabel), ['5小时', '周额度']);
+    assert.equal(snap.activeWindows[0].remainingPct, 90);
+    assert.equal(snap.activeWindows[1].remainingPct, 62);
+    assert.equal(snap.buckets.length, 4);
+
+    // Flat response.buckets[] with window suffixes in displayName
+    const flatResp = {
+        response: {
+            buckets: [
+                { displayName: 'Gemini Weekly limit', remainingFraction: 0.55, resetTime: '2026-11-30T00:00:00Z' },
+                { displayName: 'Gemini 5-hour limit', remainingFraction: 0.95, resetTime: '2026-11-25T16:00:00Z' },
+            ],
+        },
+    };
+    const flatSnap = telemetry.normalizeQuotaSnapshot({}, flatResp, 'Gemini 4 Neon');
+    assert.equal(flatSnap.activeQuota.label, 'Gemini');
+    assert.deepEqual(flatSnap.activeWindows.map((w) => w.windowLabel), ['5小时', '周额度']);
 });
 
 test('non-destructive temp ASAR patch and strip round-trip preserves syntax and unpacked count', { skip: !fs.existsSync(LIVE_ASAR) }, () => {

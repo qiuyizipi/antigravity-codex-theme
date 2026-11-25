@@ -111,14 +111,42 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
         if (/\b(?:gpt|openai|o1|o3|o4)\b/i.test(label)) return 'GPT';
         return '其他';
     };
+    const normalizeWindowLabel = (rawWin, rawName, rawDesc, rawBucketId) => {
+        const joined = [rawWin, rawName, rawDesc, rawBucketId].map(cleanText).filter(Boolean).join(' ');
+        if (/(?:5\s*-?\s*h(?:our)?s?\b|five[\s_-]*hour|5小时)/i.test(joined)) return '5小时';
+        if (/(?:\b7\s*-?\s*d(?:ays?)?\b|\b1\s*-?\s*w(?:eek)?\b|\bweek(?:ly)?\b|周额度|每周)/i.test(joined)) return '周额度';
+        if (/(?:\b24\s*-?\s*h(?:ours?)?\b|\bdaily\b|日额度|每日)/i.test(joined)) return '日额度';
+        if (/(?:\b30\s*-?\s*d(?:ays?)?\b|\bmonth(?:ly)?\b|月额度|每月)/i.test(joined)) return '月额度';
+        return cleanText(rawWin) || null;
+    };
+    const isWindowOnlyName = (name) => {
+        const t = cleanText(name);
+        if (!t) return true;
+        return /^(?:5\s*-?\s*h(?:our)?s?(?:\s+limit|\s+quota|\s+window)?|five[\s_-]*hour(?:\s+limit)?|\b7\s*-?\s*d(?:ays?)?|1\s*-?\s*w(?:eek)?|week(?:ly)?(?:\s+limit|\s+quota|\s+window)?|daily(?:\s+limit)?|monthly(?:\s+limit)?|5小时(?:额度|配额|限制|窗口)?|周额度|每周(?:额度|配额|限制)?|日额度|月额度)$/i.test(t);
+    };
+    const stripWindowSuffix = (name) => {
+        return cleanText(name)
+            .replace(/\s*[·|\-–—(（\[]*\s*(?:5\s*-?\s*h(?:our)?s?(?:\s+limit|\s+quota|\s+window)?|five[\s_-]*hour(?:\s+limit)?|week(?:ly)?(?:\s+limit|\s+quota|\s+window)?|7\s*-?\s*d(?:ays?)?|1\s*-?\s*w(?:eek)?|daily(?:\s+limit)?|monthly(?:\s+limit)?|5小时(?:额度|配额|限制|窗口)?|周额度|每周(?:额度|配额|限制)?|日额度|月额度)\s*[)）\]]*\s*$/i, '')
+            .trim();
+    };
+    const windowRank = (winLabel) => {
+        if (winLabel === '5小时') return 1;
+        if (winLabel === '日额度') return 2;
+        if (winLabel === '周额度') return 3;
+        if (winLabel === '月额度') return 4;
+        return 5;
+    };
 
     const us = (userStatusRes && userStatusRes.userStatus && typeof userStatusRes.userStatus === 'object')
         ? userStatusRes.userStatus
         : (userStatusRes && typeof userStatusRes === 'object' ? userStatusRes : {});
 
-    const qs = (quotaSummaryRes && quotaSummaryRes.summary && typeof quotaSummaryRes.summary === 'object')
-        ? quotaSummaryRes.summary
-        : (quotaSummaryRes && typeof quotaSummaryRes === 'object' ? quotaSummaryRes : {});
+    // 真实客户端 RPC 包装在 .response 下，兼容 .summary 与顶层直接返回
+    const qs = (quotaSummaryRes && quotaSummaryRes.response && typeof quotaSummaryRes.response === 'object')
+        ? quotaSummaryRes.response
+        : ((quotaSummaryRes && quotaSummaryRes.summary && typeof quotaSummaryRes.summary === 'object')
+            ? quotaSummaryRes.summary
+            : (quotaSummaryRes && typeof quotaSummaryRes === 'object' ? quotaSummaryRes : {}));
 
     const planStatus = (us.planStatus && typeof us.planStatus === 'object') ? us.planStatus : null;
     const planName = cleanText(
@@ -194,20 +222,27 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
         buckets.push(item);
     };
 
+    const nowMs = Date.now();
     const groups = Array.isArray(qs.groups) ? qs.groups : [];
     for (const g of groups) {
         if (!g || typeof g !== 'object') continue;
         const groupName = cleanText(g.displayName || g.description);
         const subBuckets = Array.isArray(g.buckets) ? g.buckets : [];
         if (subBuckets.length > 0) {
+            const parsedGroupBuckets = [];
             for (const b of subBuckets) {
                 if (!b || typeof b !== 'object') continue;
                 const frac = readQuotaFraction(b, true);
                 const { remainingPct, usedPct } = toPctPair(frac);
-                const winLabel = cleanText(b.refreshWindowLabel || b.window || '');
-                const label = cleanText(b.displayName) || cleanText(b.description) || groupName || '模型配额池';
-                pushBucket({
+                const rawBName = cleanText(b.displayName || b.description);
+                let winLabel = normalizeWindowLabel(b.refreshWindowLabel || b.window, b.displayName, b.description, b.bucketId);
+                const strippedBName = stripWindowSuffix(rawBName);
+                const label = (groupName && (!rawBName || isWindowOnlyName(rawBName)))
+                    ? groupName
+                    : (strippedBName || rawBName || groupName || '模型配额池');
+                parsedGroupBuckets.push({
                     label,
+                    groupKey: (groupName || label).toLowerCase(),
                     bucketId: cleanText(b.bucketId) || null,
                     groupName: groupName || null,
                     windowLabel: winLabel || null,
@@ -222,14 +257,27 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
                     source: 'summary',
                 });
             }
+            if (parsedGroupBuckets.length >= 2) {
+                for (const item of parsedGroupBuckets) {
+                    if (item.windowLabel) continue;
+                    const rMs = toResetMs(item.resetTime);
+                    if (rMs !== null) {
+                        item.windowLabel = (rMs - nowMs) > 18 * 3600 * 1000 ? '周额度' : '5小时';
+                    }
+                }
+            }
+            for (const item of parsedGroupBuckets) pushBucket(item);
         } else if (groupName) {
             const frac = readQuotaFraction(g, true);
             const { remainingPct, usedPct } = toPctPair(frac);
+            const winLabel = normalizeWindowLabel(g.refreshWindowLabel || g.window, g.displayName, g.description, g.bucketId);
+            const cleanGName = stripWindowSuffix(groupName) || groupName;
             pushBucket({
-                label: groupName,
+                label: cleanGName,
+                groupKey: cleanGName.toLowerCase(),
                 bucketId: cleanText(g.bucketId) || null,
-                groupName,
-                windowLabel: cleanText(g.refreshWindowLabel || g.window || '') || null,
+                groupName: cleanGName,
+                windowLabel: winLabel || null,
                 remainingFraction: frac,
                 remainingPct,
                 usedPct,
@@ -246,15 +294,18 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
     const topBuckets = Array.isArray(qs.buckets) ? qs.buckets : [];
     for (const b of topBuckets) {
         if (!b || typeof b !== 'object') continue;
-        const label = cleanText(b.displayName || b.description || b.refreshWindowLabel || b.window);
-        if (!label) continue;
+        const rawName = cleanText(b.displayName || b.description || b.refreshWindowLabel || b.window);
+        if (!rawName) continue;
+        const winLabel = normalizeWindowLabel(b.refreshWindowLabel || b.window, b.displayName, b.description, b.bucketId);
+        const label = stripWindowSuffix(rawName) || rawName;
         const frac = readQuotaFraction(b, true);
         const { remainingPct, usedPct } = toPctPair(frac);
         pushBucket({
             label,
+            groupKey: label.toLowerCase(),
             bucketId: cleanText(b.bucketId) || null,
             groupName: null,
-            windowLabel: cleanText(b.refreshWindowLabel || b.window || '') || null,
+            windowLabel: winLabel || null,
             remainingFraction: frac,
             remainingPct,
             usedPct,
@@ -347,6 +398,7 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
             const label = prevCount > 0 ? `${baseLabel} (${prevCount + 1})` : baseLabel;
             pushBucket({
                 label,
+                groupKey: label.toLowerCase(),
                 bucketId: `merged:${idx}`,
                 groupName: null,
                 windowLabel: null,
@@ -363,13 +415,26 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
         }
     }
 
-    // 5. 匹配当前对话所用模型对应的配额池
+    // 5. 匹配当前对话所用模型对应的配额池，并聚合同一组下的 5小时 + 周额度 双窗口
+    const toQuotaEntry = (src, matchedBy) => ({
+        label: src.label,
+        groupKey: src.groupKey || String(src.label || '').toLowerCase(),
+        bucketId: src.bucketId || null,
+        members: src.members || null,
+        windowLabel: src.windowLabel || null,
+        remainingFraction: src.remainingFraction,
+        remainingPct: src.remainingPct,
+        usedPct: src.usedPct,
+        resetTime: src.resetTime || null,
+        disabled: Boolean(src.disabled),
+        matchedBy,
+    });
+
     let activeQuota = null;
     const target = cleanText(currentModelLabel).toLowerCase();
     const targetFamily = stripEffortSuffix(currentModelLabel).toLowerCase();
 
     if (target) {
-        // 先找是否已有合并后的共享池覆盖该模型
         const matchedMergedPool = buckets.find((b) =>
             b.remainingFraction !== null
             && Array.isArray(b.refs)
@@ -382,45 +447,23 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
             && b.members.some((mem) => mem.toLowerCase() === targetFamily)
         );
         if (matchedMergedPool) {
-            activeQuota = {
-                label: matchedMergedPool.label,
-                bucketId: matchedMergedPool.bucketId || null,
-                members: matchedMergedPool.members || null,
-                windowLabel: matchedMergedPool.windowLabel || null,
-                remainingFraction: matchedMergedPool.remainingFraction,
-                remainingPct: matchedMergedPool.remainingPct,
-                usedPct: matchedMergedPool.usedPct,
-                resetTime: matchedMergedPool.resetTime || null,
-                disabled: Boolean(matchedMergedPool.disabled),
-                matchedBy: 'pool',
-            };
+            activeQuota = toQuotaEntry(matchedMergedPool, 'pool');
         }
 
         if (!activeQuota && targetFamily) {
             const familyWords = targetFamily.split(/\s+/).filter((w) => w.length >= 3);
             const matchedBucket = buckets.find((b) => {
                 if (b.remainingFraction === null) return false;
-                const bl = b.label.toLowerCase();
+                const bl = (b.groupKey || b.label || '').toLowerCase();
                 return bl.includes(targetFamily) || targetFamily.includes(bl)
                     || (familyWords.length > 0 && familyWords.every((w) => bl.includes(w)));
             }) || buckets.find((b) => {
                 if (b.remainingFraction === null) return false;
-                const bl = b.label.toLowerCase();
+                const bl = (b.groupKey || b.label || '').toLowerCase();
                 return familyWords.some((w) => bl.includes(w));
             });
             if (matchedBucket) {
-                activeQuota = {
-                    label: matchedBucket.label,
-                    bucketId: matchedBucket.bucketId || null,
-                    members: matchedBucket.members || null,
-                    windowLabel: matchedBucket.windowLabel || null,
-                    remainingFraction: matchedBucket.remainingFraction,
-                    remainingPct: matchedBucket.remainingPct,
-                    usedPct: matchedBucket.usedPct,
-                    resetTime: matchedBucket.resetTime || null,
-                    disabled: Boolean(matchedBucket.disabled),
-                    matchedBy: 'bucket',
-                };
+                activeQuota = toQuotaEntry(matchedBucket, 'bucket');
             }
         }
 
@@ -431,18 +474,7 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
                 m.remainingFraction !== null && m.family.toLowerCase() === targetFamily
             );
             if (exactModel) {
-                activeQuota = {
-                    label: exactModel.label,
-                    bucketId: null,
-                    members: null,
-                    windowLabel: null,
-                    remainingFraction: exactModel.remainingFraction,
-                    remainingPct: exactModel.remainingPct,
-                    usedPct: exactModel.usedPct,
-                    resetTime: exactModel.resetTime,
-                    disabled: exactModel.disabled,
-                    matchedBy: 'model',
-                };
+                activeQuota = toQuotaEntry(exactModel, 'model');
             }
         }
     }
@@ -451,18 +483,29 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
         const firstValid = buckets.find((b) => b.remainingFraction !== null)
             || rawModels.find((m) => m.remainingFraction !== null);
         if (firstValid) {
-            activeQuota = {
-                label: firstValid.label,
-                bucketId: firstValid.bucketId || null,
-                members: firstValid.members || null,
-                windowLabel: firstValid.windowLabel || null,
-                remainingFraction: firstValid.remainingFraction,
-                remainingPct: firstValid.remainingPct,
-                usedPct: firstValid.usedPct,
-                resetTime: firstValid.resetTime || null,
-                disabled: Boolean(firstValid.disabled),
-                matchedBy: 'fallback',
-            };
+            activeQuota = toQuotaEntry(firstValid, 'fallback');
+        }
+    }
+
+    let activeWindows = [];
+    if (activeQuota) {
+        const matchGroupKey = activeQuota.groupKey;
+        const siblingBuckets = buckets.filter((b) =>
+            b.remainingFraction !== null
+            && ((matchGroupKey && (b.groupKey || b.label.toLowerCase()) === matchGroupKey)
+                || (activeQuota.bucketId && b.bucketId === activeQuota.bucketId))
+        );
+        if (siblingBuckets.length > 0) {
+            siblingBuckets.sort((a, b) => windowRank(a.windowLabel) - windowRank(b.windowLabel));
+            activeWindows = siblingBuckets.map((b) => toQuotaEntry(b, activeQuota.matchedBy));
+            const primary = activeWindows[0];
+            activeQuota = Object.assign({}, primary, {
+                members: activeQuota.members || primary.members || null,
+                windows: activeWindows,
+            });
+        } else {
+            activeWindows = [Object.assign({}, activeQuota)];
+            activeQuota.windows = activeWindows;
         }
     }
 
@@ -471,7 +514,8 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
         fetchedAt: Date.now(),
         planName,
         activeQuota,
-        buckets: buckets.slice(0, 8),
+        activeWindows,
+        buckets: buckets.slice(0, 12),
         credits,
     };
 }
@@ -637,7 +681,7 @@ function buildMainTelemetryInjection(hotCssPath) {
                     if (!quotaInflight || force) {
                         quotaInflight = Promise.allSettled([
                             callLsRpc(ep, 'GetUserStatus', {}),
-                            callLsRpc(ep, 'RetrieveUserQuotaSummary', {}),
+                            callLsRpc(ep, 'RetrieveUserQuotaSummary', { request: {}, forceRefresh: Boolean(force) }),
                         ]).then(([rUser, rSummary]) => {
                             const userStatus = rUser.status === 'fulfilled' ? rUser.value : null;
                             const quotaSummary = rSummary.status === 'fulfilled' ? rSummary.value : null;
@@ -1355,12 +1399,49 @@ function buildPreloadTelemetryInjection() {
                 }
                 .quota-hero.warn .quota-rem { color: var(--warn-fg); }
                 .quota-hero.danger .quota-rem { color: var(--danger-fg); }
+                .quota-win-list {
+                    display: grid;
+                    gap: 7px;
+                    margin-top: 6px;
+                }
+                .quota-win-row + .quota-win-row {
+                    padding-top: 6px;
+                    border-top: 1px dashed rgba(128, 128, 128, 0.20);
+                }
+                .quota-win-head {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 6px;
+                    font-size: 10.5px;
+                }
+                .win-tag {
+                    font-size: 10px;
+                    font-weight: 600;
+                    padding: 1px 6px;
+                    border-radius: 5px;
+                    background: rgba(128, 128, 128, 0.14);
+                    color: var(--ink-strong);
+                }
+                .win-pct {
+                    font-size: 10.5px;
+                    font-weight: 650;
+                    font-variant-numeric: tabular-nums;
+                    color: var(--ink-strong);
+                }
+                .win-reset {
+                    font-size: 10px;
+                    color: var(--muted);
+                    margin-top: 3px;
+                    text-align: right;
+                    font-variant-numeric: tabular-nums;
+                }
                 .bar-track {
                     height: 5px;
                     border-radius: 999px;
                     background: rgba(128, 128, 128, 0.16);
                     overflow: hidden;
-                    margin-top: 6px;
+                    margin-top: 5px;
                 }
                 .bar-fill {
                     height: 100%;
@@ -1578,11 +1659,14 @@ function buildPreloadTelemetryInjection() {
                                 <span class="quota-name" id="quota-active-name">—</span>
                                 <span class="quota-rem" id="quota-active-pct">—</span>
                             </div>
-                            <div class="bar-track"><div class="bar-fill" id="bar-quota"></div></div>
-                            <div class="quota-meta">
-                                <span id="quota-active-used">已用 —</span>
-                                <span id="quota-active-reset">刷新 —</span>
+                            <div id="quota-single-wrap">
+                                <div class="bar-track"><div class="bar-fill" id="bar-quota"></div></div>
+                                <div class="quota-meta">
+                                    <span id="quota-active-used">已用 —</span>
+                                    <span id="quota-active-reset">刷新 —</span>
+                                </div>
                             </div>
+                            <div class="quota-win-list hidden" id="quota-active-windows"></div>
                         </div>
                         <div class="bucket-list hidden" id="bucket-list"></div>
                         <button class="more-btn hidden" id="btn-more-buckets" type="button" aria-expanded="false">
@@ -1625,9 +1709,11 @@ function buildPreloadTelemetryInjection() {
                 quotaHero: q('quota-hero'),
                 quotaActiveName: q('quota-active-name'),
                 quotaActivePct: q('quota-active-pct'),
+                quotaSingleWrap: q('quota-single-wrap'),
                 barQuota: q('bar-quota'),
                 quotaActiveUsed: q('quota-active-used'),
                 quotaActiveReset: q('quota-active-reset'),
+                quotaActiveWindows: q('quota-active-windows'),
                 bucketList: q('bucket-list'),
                 btnMoreBuckets: q('btn-more-buckets'),
                 moreBucketsText: q('more-buckets-text'),
@@ -1915,19 +2001,74 @@ function buildPreloadTelemetryInjection() {
                     els.planTag.classList.add('hidden');
                 }
                 const aq = lastQuota.activeQuota;
+                const activeWindows = (aq && Array.isArray(aq.windows) && aq.windows.length > 0)
+                    ? aq.windows
+                    : (Array.isArray(lastQuota.activeWindows) && lastQuota.activeWindows.length > 0
+                        ? lastQuota.activeWindows
+                        : (aq ? [aq] : []));
+
                 if (aq) {
-                    const usedFrac = aq.usedPct !== null ? aq.usedPct / 100 : null;
                     els.quotaActiveName.textContent = aq.label;
                     els.quotaActiveName.title = (Array.isArray(aq.members) && aq.members.length > 1)
                         ? `${aq.label}（含 ${aq.members.join('、')}）`
                         : aq.label;
-                    els.quotaActivePct.textContent = aq.remainingPct !== null ? ('剩 ' + aq.remainingPct + '%') : (aq.disabled ? '不可用' : '—');
-                    els.quotaActiveUsed.textContent = aq.usedPct !== null ? ('已用 ' + aq.usedPct + '%') : '已用 —';
-                    els.quotaActiveReset.textContent = '刷新 ' + fmtCountdown(aq.resetTime);
-                    els.barQuota.style.width = aq.remainingPct !== null ? clampNum(aq.remainingPct, 0, 100) + '%' : '0%';
-                    setToneClass(els.quotaHero, usedFrac);
-                    setToneClass(els.barQuota, usedFrac);
+
+                    if (activeWindows.length >= 2) {
+                        els.quotaActivePct.classList.add('hidden');
+                        els.quotaSingleWrap.classList.add('hidden');
+                        els.quotaActiveWindows.classList.remove('hidden');
+                        els.quotaActiveWindows.innerHTML = '';
+                        let maxUsedFrac = 0;
+                        for (const w of activeWindows) {
+                            const wUsedFrac = w.usedPct !== null ? w.usedPct / 100 : 0;
+                            if (wUsedFrac > maxUsedFrac) maxUsedFrac = wUsedFrac;
+                            const rowEl = document.createElement('div');
+                            rowEl.className = 'quota-win-row';
+                            const headEl = document.createElement('div');
+                            headEl.className = 'quota-win-head';
+                            const tagEl = document.createElement('span');
+                            tagEl.className = 'win-tag';
+                            tagEl.textContent = w.windowLabel || '窗口';
+                            const pctEl = document.createElement('span');
+                            pctEl.className = 'win-pct';
+                            pctEl.textContent = w.remainingPct !== null ? `已用 ${w.usedPct}% · 剩 ${w.remainingPct}%` : (w.disabled ? '不可用' : '—');
+                            headEl.appendChild(tagEl);
+                            headEl.appendChild(pctEl);
+
+                            const trackEl = document.createElement('div');
+                            trackEl.className = 'bar-track';
+                            const fillEl = document.createElement('div');
+                            fillEl.className = 'bar-fill';
+                            fillEl.style.width = w.remainingPct !== null ? clampNum(w.remainingPct, 0, 100) + '%' : '0%';
+                            setToneClass(fillEl, wUsedFrac);
+                            trackEl.appendChild(fillEl);
+
+                            const resetEl = document.createElement('div');
+                            resetEl.className = 'win-reset';
+                            resetEl.textContent = '刷新 ' + fmtCountdown(w.resetTime);
+
+                            rowEl.appendChild(headEl);
+                            rowEl.appendChild(trackEl);
+                            rowEl.appendChild(resetEl);
+                            els.quotaActiveWindows.appendChild(rowEl);
+                        }
+                        setToneClass(els.quotaHero, maxUsedFrac);
+                    } else {
+                        const usedFrac = aq.usedPct !== null ? aq.usedPct / 100 : null;
+                        els.quotaActivePct.classList.remove('hidden');
+                        els.quotaSingleWrap.classList.remove('hidden');
+                        els.quotaActiveWindows.classList.add('hidden');
+                        els.quotaActivePct.textContent = aq.remainingPct !== null ? ('剩 ' + aq.remainingPct + '%') : (aq.disabled ? '不可用' : '—');
+                        els.quotaActiveUsed.textContent = (aq.windowLabel ? aq.windowLabel + ' · ' : '') + (aq.usedPct !== null ? ('已用 ' + aq.usedPct + '%') : '已用 —');
+                        els.quotaActiveReset.textContent = '刷新 ' + fmtCountdown(aq.resetTime);
+                        els.barQuota.style.width = aq.remainingPct !== null ? clampNum(aq.remainingPct, 0, 100) + '%' : '0%';
+                        setToneClass(els.quotaHero, usedFrac);
+                        setToneClass(els.barQuota, usedFrac);
+                    }
                 } else {
+                    els.quotaActivePct.classList.remove('hidden');
+                    els.quotaSingleWrap.classList.remove('hidden');
+                    els.quotaActiveWindows.classList.add('hidden');
                     els.quotaActiveName.textContent = '暂未匹配';
                     els.quotaActivePct.textContent = '—';
                     els.quotaActiveUsed.textContent = '已用 —';
@@ -1940,12 +2081,13 @@ function buildPreloadTelemetryInjection() {
                 const extraRows = [];
                 const buckets = Array.isArray(lastQuota.buckets) ? lastQuota.buckets : [];
                 for (const b of buckets) {
-                    const sameAsActive = aq && (
-                        (aq.bucketId && b.bucketId && aq.bucketId === b.bucketId)
-                        || (b.label === aq.label && b.remainingPct === aq.remainingPct)
-                        || (Array.isArray(aq.members) && Array.isArray(b.members) && aq.members.length === b.members.length && aq.members[0] === b.members[0])
+                    const bGroup = (b.groupKey || b.label || '').toLowerCase();
+                    const inActiveWindows = activeWindows.some((aw) =>
+                        (aw.bucketId && b.bucketId && aw.bucketId === b.bucketId)
+                        || (bGroup && (aw.groupKey || aw.label || '').toLowerCase() === bGroup && (aw.windowLabel || '') === (b.windowLabel || ''))
+                        || (Array.isArray(aw.members) && Array.isArray(b.members) && aw.members.length === b.members.length && aw.members[0] === b.members[0])
                     );
-                    if (sameAsActive) continue;
+                    if (inActiveWindows) continue;
                     const tipParts = [];
                     if (Array.isArray(b.members) && b.members.length > 1) tipParts.push('共享：' + b.members.join('、'));
                     if (b.remainingPct !== null) tipParts.push(`已用 ${b.usedPct}% · 剩 ${b.remainingPct}%`);
@@ -1970,7 +2112,8 @@ function buildPreloadTelemetryInjection() {
                 }
 
                 els.bucketList.innerHTML = '';
-                const limit = showAllBuckets ? extraRows.length : 3;
+                const defaultCap = 4;
+                const limit = showAllBuckets ? extraRows.length : defaultCap;
                 const shown = extraRows.slice(0, limit);
                 if (shown.length > 0) {
                     els.bucketList.classList.remove('hidden');
@@ -2013,15 +2156,18 @@ function buildPreloadTelemetryInjection() {
                 } else {
                     els.bucketList.classList.add('hidden');
                 }
-                if (extraRows.length > 3) {
+                if (extraRows.length > defaultCap) {
                     els.btnMoreBuckets.classList.remove('hidden');
                     els.btnMoreBuckets.setAttribute('aria-expanded', showAllBuckets ? 'true' : 'false');
-                    els.moreBucketsText.textContent = showAllBuckets ? '收起其余项' : `展开其余 ${extraRows.length - 3} 项`;
+                    els.moreBucketsText.textContent = showAllBuckets ? '收起其余项' : `展开其余 ${extraRows.length - defaultCap} 项`;
                 } else {
                     els.btnMoreBuckets.classList.add('hidden');
                 }
             } else {
                 els.planTag.classList.add('hidden');
+                els.quotaActivePct.classList.remove('hidden');
+                els.quotaSingleWrap.classList.remove('hidden');
+                els.quotaActiveWindows.classList.add('hidden');
                 els.quotaActiveName.textContent = lastQuota && lastQuota.reason === 'offline' ? '等待本地服务' : '正在同步额度…';
                 els.quotaActivePct.textContent = '—';
                 els.quotaActiveUsed.textContent = '已用 —';
@@ -2034,8 +2180,17 @@ function buildPreloadTelemetryInjection() {
             const pillParts = [];
             if (ctx && typeof ctx.usedFraction === 'number') pillParts.push('上下文 ' + fmtPct(ctx.usedFraction));
             if (primaryTps !== null) pillParts.push(fmtTpsValue(primaryTps) + ' t/s');
-            if (lastQuota && lastQuota.activeQuota && lastQuota.activeQuota.remainingPct !== null) {
-                pillParts.push('额剩 ' + lastQuota.activeQuota.remainingPct + '%');
+            if (lastQuota && lastQuota.activeQuota) {
+                const wins = Array.isArray(lastQuota.activeQuota.windows) && lastQuota.activeQuota.windows.length > 0
+                    ? lastQuota.activeQuota.windows
+                    : [lastQuota.activeQuota];
+                const w5 = wins.find((w) => w.windowLabel === '5小时');
+                const wW = wins.find((w) => w.windowLabel === '周额度');
+                if (w5 && wW && w5.remainingPct !== null && wW.remainingPct !== null) {
+                    pillParts.push(`5h ${w5.remainingPct}% · 周 ${wW.remainingPct}%`);
+                } else if (lastQuota.activeQuota.remainingPct !== null) {
+                    pillParts.push('额剩 ' + lastQuota.activeQuota.remainingPct + '%');
+                }
             }
             els.pillText.textContent = pillParts.length ? pillParts.join(' · ') : '实时监测';
         }
