@@ -44,6 +44,8 @@ html:not(.dark):not([data-codex-mode="dark"]):not(:has(> body.dark)) body:not(.d
     --codex-text: #1B1F24;
     --codex-text-strong: #000000;
     --codex-text-row: #24292F;
+    --codex-project-title: #16191D;
+    --codex-conv-title: #262B33;
     --codex-text-secondary: #374151;
     --codex-text-muted: #525866;
     --codex-text-subtle: #525866;
@@ -75,6 +77,7 @@ html:not(.dark):not([data-codex-mode="dark"]):not(:has(> body.dark)) body:not(.d
     --codex-ink-prose: 0 0 0.40px color-mix(in srgb, currentColor 50%, transparent);
     --codex-ink-bold: 0 0 0.55px color-mix(in srgb, currentColor 70%, transparent);
     --codex-ink-ui: 0 0 0.35px color-mix(in srgb, currentColor 45%, transparent);
+    --codex-ink-conv: 0 0 0.28px color-mix(in srgb, currentColor 32%, transparent);
 
     /* 同步覆盖 Antigravity 原生语义前景色，根除全界面发白发灰 */
     --foreground: #1B1F24 !important;
@@ -119,6 +122,8 @@ body[data-agy-theme].dark {
     --codex-text: #E6E6E6;
     --codex-text-strong: #FFFFFF;
     --codex-text-row: #E0E0E0;
+    --codex-project-title: #F3F4F6;
+    --codex-conv-title: #D5D9E0;
     --codex-text-secondary: #D4D4D4;
     --codex-text-muted: #A1A1AA;
     --codex-text-subtle: #A1A1AA;
@@ -148,6 +153,7 @@ body[data-agy-theme].dark {
     --codex-ink-prose: none;
     --codex-ink-bold: none;
     --codex-ink-ui: none;
+    --codex-ink-conv: none;
 
     --foreground: #F2F2F2 !important;
     --secondary-foreground: #DEDEDE !important;
@@ -183,6 +189,8 @@ body[data-agy-theme].dark {
         --codex-text: #E6E6E6;
         --codex-text-strong: #FFFFFF;
         --codex-text-row: #E0E0E0;
+        --codex-project-title: #F3F4F6;
+        --codex-conv-title: #D5D9E0;
         --codex-text-secondary: #D4D4D4;
         --codex-text-muted: #A1A1AA;
         --codex-text-subtle: #A1A1AA;
@@ -212,6 +220,7 @@ body[data-agy-theme].dark {
         --codex-ink-prose: none;
         --codex-ink-bold: none;
         --codex-ink-ui: none;
+        --codex-ink-conv: none;
 
         --foreground: #F2F2F2 !important;
         --secondary-foreground: #DEDEDE !important;
@@ -331,23 +340,23 @@ aside {
     box-shadow: 0 2px 4px -2px var(--codex-sidebar) !important;
 }
 
-/* 会话列表行：14px 实墨清晰字 + 30px 轻盈行高 */
+/* 会话列表行：右缩进对齐项目文字，与上方文件夹图标形成树形阶梯 */
 [data-testid="conversation-row-sidebar"] {
-    min-height: 30px !important;
-    padding: 4px 10px !important;
+    min-height: 28px !important;
+    padding: 3.5px 10px 3.5px 32px !important;
     border-radius: 8px !important;
-    margin-bottom: 1.5px !important;
+    margin-bottom: 1px !important;
     transition: background-color 0.12s ease !important;
 }
 
 [data-testid="conversation-row-sidebar"] span.truncate,
 [data-testid="conversation-row-sidebar"] .truncate {
     font-family: var(--font-sans) !important;
-    font-size: 14px !important;
-    line-height: 20px !important;
+    font-size: 13.5px !important;
+    line-height: 19px !important;
     font-weight: 400 !important;
-    color: var(--codex-text-row) !important;
-    text-shadow: var(--codex-ink-ui) !important;
+    color: var(--codex-conv-title) !important;
+    text-shadow: var(--codex-ink-conv) !important;
 }
 
 /* 激活选中项（兼容 2.33+ data-selected="true"、.agy-sidebar-row 与 bg-sidebar-secondary） */
@@ -361,8 +370,9 @@ aside {
 [data-testid="conversation-row-sidebar"].bg-sidebar-secondary span.truncate,
 [data-testid="conversation-row-sidebar"][data-selected="true"] span.truncate,
 .agy-sidebar-row[data-selected="true"] span.truncate {
-    color: var(--codex-text) !important;
+    color: var(--codex-project-title) !important;
     font-weight: 500 !important;
+    text-shadow: var(--codex-ink-ui) !important;
 }
 [data-testid="conversation-row-sidebar"]:hover {
     background-color: var(--codex-sidebar-hover) !important;
@@ -392,21 +402,61 @@ aside {
     color: var(--codex-text-muted) !important;
 }
 
-/* 项目折叠标题 */
+/* 项目文件夹标题：15px 600 纯黑/纯白高对比锚点（明显大过 13.5px 子对话，拉开层级差） */
 [data-testid="project-header"],
-[data-testid="conversation-list-sidebar"] .text-sm {
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    color: var(--codex-text-row) !important;
+[data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button):has(svg) {
+    font-size: 15px !important;
+    line-height: 22px !important;
+    font-weight: 600 !important;
+    color: var(--codex-text-strong) !important;
+    text-decoration: none !important;
+    border-radius: 8px !important;
+}
+[data-testid="project-header"] span,
+[data-testid="project-header"] div,
+[data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button):has(svg) span,
+[data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button):has(svg) div {
+    font-size: 15px !important;
+    line-height: 22px !important;
+    font-weight: 600 !important;
+    color: var(--codex-text-strong) !important;
+    text-shadow: var(--codex-ink-ui) !important;
+    text-decoration: none !important;
+}
+[data-testid="project-header"]:hover,
+[data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button):has(svg):hover {
+    background-color: var(--codex-sidebar-hover) !important;
+    text-decoration: none !important;
+}
+[data-testid="project-header"] svg,
+[data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button):has(svg) svg {
+    color: var(--codex-project-title) !important;
+    opacity: 0.9 !important;
 }
 
-/* 侧边栏折叠控制按钮 */
-[data-testid="conversation-list-sidebar"] button:not([data-testid="conversation-row-sidebar"] button) {
-    font-size: 13px !important;
-    line-height: 19px !important;
-    color: var(--codex-text-muted) !important;
-    padding-top: 3px !important;
+/* 仅含文字的次级展开按钮（如“显示全部 (9)”）：柔灰小字紧贴所属项目并与下组拉开呼吸间距 */
+[data-testid="conversation-list-sidebar"] button:not(:has(svg)):not([data-testid="conversation-row-sidebar"] button) {
+    font-size: 12.5px !important;
+    line-height: 18px !important;
+    font-weight: 400 !important;
+    color: var(--codex-text-faint) !important;
+    padding-top: 2px !important;
     padding-bottom: 3px !important;
+    margin-bottom: 10px !important;
+    text-decoration: none !important;
+}
+[data-testid="conversation-list-sidebar"] button:not(:has(svg)):not([data-testid="conversation-row-sidebar"] button):hover {
+    color: var(--codex-text-secondary) !important;
+}
+
+/* 项目内对话组容器：组内紧贴标题，组尾留出 8px 呼吸间距分隔下一个项目 */
+[data-testid="conversation-list-sidebar"] div:has(> [data-testid="conversation-row-sidebar"]) {
+    margin-top: 2px !important;
+    margin-bottom: 8px !important;
+}
+[data-testid="conversation-list-sidebar"] div:has(> [data-testid="conversation-row-sidebar"]):has(+ button:not(:has(svg))),
+[data-testid="conversation-list-sidebar"] div:has(> [data-testid="conversation-row-sidebar"]):has(+ div > button:not(:has(svg))) {
+    margin-bottom: 2px !important;
 }
 
 /* 左侧顶部与底部导航按钮 */
@@ -925,5 +975,12 @@ div.sticky.top-0:has([data-testid="user-input-step"]) {
 [data-testid="autoscroll-viewport"] div.sticky.top-0::after,
 [data-testid="conversation-view"] div.sticky.top-0::after,
 div.sticky.top-0:has([data-testid="user-input-step"])::after {
+    display: none !important;
+}
+
+/* 12. 隐藏汉化包底栏重复的上下文圆环与速率胶囊（统一由右侧常驻监测面板展示） */
+.ag-ctx-monitor-host,
+.ag-ctx-speed-host,
+#ag-ctx-card-portal {
     display: none !important;
 }

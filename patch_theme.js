@@ -9,7 +9,13 @@ const { spawnSync, execSync } = require('child_process');
 
 const SCRIPT_DIR = __dirname;
 const CSS_PATH = path.join(SCRIPT_DIR, 'codex_theme.css');
+const TELEMETRY_PATH = path.join(SCRIPT_DIR, 'codex_telemetry_rail.js');
 const PLUGINS_SRC_ROOT = path.join(SCRIPT_DIR, 'plugins');
+
+function loadTelemetryModule() {
+    if (!fs.existsSync(TELEMETRY_PATH)) return null;
+    try { return require(TELEMETRY_PATH); } catch { return null; }
+}
 const BUNDLED_PLUGINS = ['codex-config-hub', 'task-pulse'];
 const SELF_RAW_BASE = (process.env.CODEX_THEME_RAW_BASE || 'https://raw.githubusercontent.com/qiuyizipi/antigravity-codex-theme/main').replace(/\/+$/, '');
 const CN_REPO_URL = 'https://github.com/Silas-02/antigravity-desktop-cn.git';
@@ -456,6 +462,11 @@ function stripMainHotCss(mainCode) {
 }
 
 function buildMainHotCssInjection(hotCssPath) {
+    const telemetryMod = loadTelemetryModule();
+    if (telemetryMod && typeof telemetryMod.buildMainTelemetryInjection === 'function') {
+        return telemetryMod.buildMainTelemetryInjection(hotCssPath);
+    }
+    if (!hotCssPath) return '';
     const pLiteral = JSON.stringify(hotCssPath);
     return `\n${SIG_MAIN_START}\n(() => {\n    try {\n        const _el = require('electron');\n        const _fs = require('fs');\n        const _p = ${pLiteral};\n        let _lastMt = 0;\n        let _lastCss = '';\n        if (_el && _el.ipcMain && typeof _el.ipcMain.handle === 'function') {\n            try { _el.ipcMain.removeHandler('codex:read-hot-css'); } catch {}\n            _el.ipcMain.handle('codex:read-hot-css', () => {\n                try {\n                    if (!_fs.existsSync(_p)) return null;\n                    const mt = _fs.statSync(_p).mtimeMs;\n                    if (mt !== _lastMt || !_lastCss) {\n                        _lastMt = mt;\n                        _lastCss = _fs.readFileSync(_p, 'utf8');\n                    }\n                    return { mt, css: _lastCss };\n                } catch { return null; }\n            });\n        }\n    } catch {}\n})();\n${SIG_MAIN_END}\n`;
 }
@@ -466,7 +477,11 @@ function buildInjection(css, hotCssPath) {
         .replace(/`/g, '\\`')
         .replace(/\$/g, '\\$');
     const hotPathLiteral = hotCssPath ? JSON.stringify(hotCssPath) : 'null';
-    return `\n${SIG_START}\n(() => {\n    let themeCss = \`${escapedCss}\`;\n    const HOT_CSS_PATH = ${hotPathLiteral};\n    let lastHotMtime = 0;\n    const STYLE_ID = 'antigravity-codex-theme-patch';\n    let lastOverlayMode = '';\n    let overlaySyncTimer = null;\n    function applyThemeCssText(nextCss) {\n        if (!nextCss || nextCss === themeCss) return;\n        themeCss = nextCss;\n        const s = document.getElementById(STYLE_ID);\n        if (s && s.textContent !== themeCss) s.textContent = themeCss;\n    }\n    function reloadHotCssIfChanged() {\n        if (!HOT_CSS_PATH) return;\n        try {\n            if (typeof electron_1 !== 'undefined' && electron_1 && electron_1.ipcRenderer) {\n                void Promise.resolve(electron_1.ipcRenderer.invoke('codex:read-hot-css')).then((res) => {\n                    if (!res || !res.css) return;\n                    if (res.mt !== lastHotMtime || res.css !== themeCss) {\n                        lastHotMtime = res.mt || Date.now();\n                        applyThemeCssText(res.css);\n                    }\n                }).catch(() => undefined);\n                return;\n            }\n        } catch {}\n        try {\n            const _fs = require('fs');\n            if (!_fs.existsSync(HOT_CSS_PATH)) return;\n            const mt = _fs.statSync(HOT_CSS_PATH).mtimeMs;\n            if (mt !== lastHotMtime) {\n                lastHotMtime = mt;\n                applyThemeCssText(_fs.readFileSync(HOT_CSS_PATH, 'utf8'));\n            }\n        } catch {}\n    }\n    function parseHexLum(val) {\n        const m = String(val || '').trim().match(/^#([0-9a-f]{6}|[0-9a-f]{3})$/i);\n        if (!m) return null;\n        const hex = m[1].length === 3 ? m[1].split('').map(c => c + c).join('') : m[1];\n        const r = parseInt(hex.slice(0, 2), 16);\n        const g = parseInt(hex.slice(2, 4), 16);\n        const b = parseInt(hex.slice(4, 6), 16);\n        return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;\n    }\n    function detectCodexMode() {\n        const h = document.documentElement;\n        const b = document.body;\n        const r = document.getElementById('root') || (b && b.firstElementChild);\n        const nodes = [h, b, r].filter(Boolean);\n        for (const el of nodes) {\n            const cl = el.classList;\n            const dt = el.getAttribute('data-theme') || el.getAttribute('data-color-scheme') || '';\n            if ((cl && (cl.contains('dark') || cl.contains('theme-dark') || cl.contains('vscode-dark'))) || /dark/i.test(dt)) return 'dark';\n            if ((cl && (cl.contains('light') || cl.contains('theme-light') || cl.contains('vscode-light'))) || /light/i.test(dt)) return 'light';\n        }\n        try {\n            if (h) {\n                const st = getComputedStyle(h);\n                const cs = st.colorScheme || '';\n                if (cs.includes('dark') && !cs.includes('light')) return 'dark';\n                if (cs.includes('light') && !cs.includes('dark')) return 'light';\n                const nativeBg = st.getPropertyValue('--background');\n                const lum = parseHexLum(nativeBg);\n                if (lum !== null) return lum < 0.5 ? 'dark' : 'light';\n            }\n        } catch {}\n        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';\n    }\n    function syncTitleBarOverlay(mode, force) {\n        if (!force && mode === lastOverlayMode) return;\n        lastOverlayMode = mode;\n        if (overlaySyncTimer) clearTimeout(overlaySyncTimer);\n        const pushOverlay = () => {\n            try {\n                if (typeof electron_1 !== 'undefined' && electron_1 && electron_1.ipcRenderer) {\n                    const opts = mode === 'dark'\n                        ? { color: '#181818', symbolColor: '#ECECEC' }\n                        : { color: '#F8F9FC', symbolColor: '#1F2328' };\n                    void Promise.resolve(electron_1.ipcRenderer.invoke('window:set-title-bar-overlay', opts)).catch(() => undefined);\n                }\n            } catch {}\n        };\n        pushOverlay();\n        overlaySyncTimer = setTimeout(pushOverlay, 350);\n        setTimeout(pushOverlay, 1200);\n    }\n    let pinning = false;\n    function ensureStylePinned() {\n        if (pinning) return;\n        const target = document.head || document.documentElement;\n        if (!target) return;\n        pinning = true;\n        try {\n            let style = document.getElementById(STYLE_ID);\n            if (!style) {\n                style = document.createElement('style');\n                style.id = STYLE_ID;\n                style.textContent = themeCss;\n                target.appendChild(style);\n            } else if (style.parentNode !== target || target.lastElementChild !== style) {\n                target.appendChild(style);\n            }\n        } finally {\n            pinning = false;\n        }\n    }\n    function syncCodexMode(forceOverlay) {\n        const h = document.documentElement;\n        if (!h) return;\n        const mode = detectCodexMode();\n        if (h.getAttribute('data-codex-mode') !== mode) {\n            h.setAttribute('data-codex-mode', mode);\n            syncTitleBarOverlay(mode, true);\n        } else if (forceOverlay) {\n            syncTitleBarOverlay(mode, true);\n        }\n    }\n    let htmlObserved = false;\n    let headObserved = false;\n    let bodyObserved = false;\n    let mqBound = false;\n    let watchdogStarted = false;\n    let attrObs = null;\n    let headObs = null;\n    function startThemeObserver() {\n        if (typeof MutationObserver !== 'undefined') {\n            if (!attrObs) attrObs = new MutationObserver(() => { syncCodexMode(false); ensureStylePinned(); });\n            if (!htmlObserved && document.documentElement) {\n                htmlObserved = true;\n                attrObs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme', 'style'] });\n            }\n            if (!bodyObserved && document.body) {\n                bodyObserved = true;\n                attrObs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme'] });\n            }\n            if (!headObserved && document.head) {\n                headObserved = true;\n                headObs = new MutationObserver(() => ensureStylePinned());\n                headObs.observe(document.head, { childList: true });\n            }\n        }\n        if (!mqBound) {\n            mqBound = true;\n            try {\n                const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');\n                if (mq && mq.addEventListener) mq.addEventListener('change', () => syncCodexMode(true));\n            } catch {}\n        }\n        if (!watchdogStarted) {\n            watchdogStarted = true;\n            setInterval(() => {\n                reloadHotCssIfChanged();\n                startThemeObserver();\n                ensureStylePinned();\n                syncCodexMode(false);\n            }, 800);\n        }\n    }\n    function injectCodexTheme() {\n        ensureStylePinned();\n        reloadHotCssIfChanged();\n        syncCodexMode(true);\n        startThemeObserver();\n    }\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', injectCodexTheme);\n    } else {\n        injectCodexTheme();\n    }\n    window.addEventListener('load', injectCodexTheme);\n    window.addEventListener('hashchange', () => setTimeout(injectCodexTheme, 120));\n    window.addEventListener('popstate', () => setTimeout(injectCodexTheme, 120));\n})();\n${SIG_END}\n`;
+    const telemetryMod = loadTelemetryModule();
+    const telemetryJs = (telemetryMod && typeof telemetryMod.buildPreloadTelemetryInjection === 'function')
+        ? telemetryMod.buildPreloadTelemetryInjection()
+        : '';
+    return `\n${SIG_START}\n(() => {\n    let themeCss = \`${escapedCss}\`;\n    const HOT_CSS_PATH = ${hotPathLiteral};\n    let lastHotMtime = 0;\n    const STYLE_ID = 'antigravity-codex-theme-patch';\n    let lastOverlayMode = '';\n    let overlaySyncTimer = null;\n    function applyThemeCssText(nextCss) {\n        if (!nextCss || nextCss === themeCss) return;\n        themeCss = nextCss;\n        const s = document.getElementById(STYLE_ID);\n        if (s && s.textContent !== themeCss) s.textContent = themeCss;\n    }\n    function reloadHotCssIfChanged() {\n        if (!HOT_CSS_PATH) return;\n        try {\n            if (typeof electron_1 !== 'undefined' && electron_1 && electron_1.ipcRenderer) {\n                void Promise.resolve(electron_1.ipcRenderer.invoke('codex:read-hot-css')).then((res) => {\n                    if (!res || !res.css) return;\n                    if (res.mt !== lastHotMtime || res.css !== themeCss) {\n                        lastHotMtime = res.mt || Date.now();\n                        applyThemeCssText(res.css);\n                    }\n                }).catch(() => undefined);\n                return;\n            }\n        } catch {}\n        try {\n            const _fs = require('fs');\n            if (!_fs.existsSync(HOT_CSS_PATH)) return;\n            const mt = _fs.statSync(HOT_CSS_PATH).mtimeMs;\n            if (mt !== lastHotMtime) {\n                lastHotMtime = mt;\n                applyThemeCssText(_fs.readFileSync(HOT_CSS_PATH, 'utf8'));\n            }\n        } catch {}\n    }\n    function parseHexLum(val) {\n        const m = String(val || '').trim().match(/^#([0-9a-f]{6}|[0-9a-f]{3})$/i);\n        if (!m) return null;\n        const hex = m[1].length === 3 ? m[1].split('').map(c => c + c).join('') : m[1];\n        const r = parseInt(hex.slice(0, 2), 16);\n        const g = parseInt(hex.slice(2, 4), 16);\n        const b = parseInt(hex.slice(4, 6), 16);\n        return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;\n    }\n    function detectCodexMode() {\n        const h = document.documentElement;\n        const b = document.body;\n        const r = document.getElementById('root') || (b && b.firstElementChild);\n        const nodes = [h, b, r].filter(Boolean);\n        for (const el of nodes) {\n            const cl = el.classList;\n            const dt = el.getAttribute('data-theme') || el.getAttribute('data-color-scheme') || '';\n            if ((cl && (cl.contains('dark') || cl.contains('theme-dark') || cl.contains('vscode-dark'))) || /dark/i.test(dt)) return 'dark';\n            if ((cl && (cl.contains('light') || cl.contains('theme-light') || cl.contains('vscode-light'))) || /light/i.test(dt)) return 'light';\n        }\n        try {\n            if (h) {\n                const st = getComputedStyle(h);\n                const cs = st.colorScheme || '';\n                if (cs.includes('dark') && !cs.includes('light')) return 'dark';\n                if (cs.includes('light') && !cs.includes('dark')) return 'light';\n                const nativeBg = st.getPropertyValue('--background');\n                const lum = parseHexLum(nativeBg);\n                if (lum !== null) return lum < 0.5 ? 'dark' : 'light';\n            }\n        } catch {}\n        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';\n    }\n    function syncTitleBarOverlay(mode, force) {\n        if (!force && mode === lastOverlayMode) return;\n        lastOverlayMode = mode;\n        if (overlaySyncTimer) clearTimeout(overlaySyncTimer);\n        const pushOverlay = () => {\n            try {\n                if (typeof electron_1 !== 'undefined' && electron_1 && electron_1.ipcRenderer) {\n                    const opts = mode === 'dark'\n                        ? { color: '#181818', symbolColor: '#ECECEC' }\n                        : { color: '#F8F9FC', symbolColor: '#1F2328' };\n                    void Promise.resolve(electron_1.ipcRenderer.invoke('window:set-title-bar-overlay', opts)).catch(() => undefined);\n                }\n            } catch {}\n        };\n        pushOverlay();\n        overlaySyncTimer = setTimeout(pushOverlay, 350);\n        setTimeout(pushOverlay, 1200);\n    }\n    let pinning = false;\n    function ensureStylePinned() {\n        if (pinning) return;\n        const target = document.head || document.documentElement;\n        if (!target) return;\n        pinning = true;\n        try {\n            let style = document.getElementById(STYLE_ID);\n            if (!style) {\n                style = document.createElement('style');\n                style.id = STYLE_ID;\n                style.textContent = themeCss;\n                target.appendChild(style);\n            } else if (style.parentNode !== target || target.lastElementChild !== style) {\n                target.appendChild(style);\n            }\n        } finally {\n            pinning = false;\n        }\n    }\n    function syncCodexMode(forceOverlay) {\n        const h = document.documentElement;\n        if (!h) return;\n        const mode = detectCodexMode();\n        if (h.getAttribute('data-codex-mode') !== mode) {\n            h.setAttribute('data-codex-mode', mode);\n            syncTitleBarOverlay(mode, true);\n        } else if (forceOverlay) {\n            syncTitleBarOverlay(mode, true);\n        }\n    }\n    let htmlObserved = false;\n    let headObserved = false;\n    let bodyObserved = false;\n    let mqBound = false;\n    let watchdogStarted = false;\n    let attrObs = null;\n    let headObs = null;\n    function startThemeObserver() {\n        if (typeof MutationObserver !== 'undefined') {\n            if (!attrObs) attrObs = new MutationObserver(() => { syncCodexMode(false); ensureStylePinned(); });\n            if (!htmlObserved && document.documentElement) {\n                htmlObserved = true;\n                attrObs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme', 'style'] });\n            }\n            if (!bodyObserved && document.body) {\n                bodyObserved = true;\n                attrObs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-scheme'] });\n            }\n            if (!headObserved && document.head) {\n                headObserved = true;\n                headObs = new MutationObserver(() => ensureStylePinned());\n                headObs.observe(document.head, { childList: true });\n            }\n        }\n        if (!mqBound) {\n            mqBound = true;\n            try {\n                const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');\n                if (mq && mq.addEventListener) mq.addEventListener('change', () => syncCodexMode(true));\n            } catch {}\n        }\n        if (!watchdogStarted) {\n            watchdogStarted = true;\n            setInterval(() => {\n                reloadHotCssIfChanged();\n                startThemeObserver();\n                ensureStylePinned();\n                syncCodexMode(false);\n            }, 800);\n        }\n    }\n    function injectCodexTheme() {\n        ensureStylePinned();\n        reloadHotCssIfChanged();\n        syncCodexMode(true);\n        startThemeObserver();\n    }\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', injectCodexTheme);\n    } else {\n        injectCodexTheme();\n    }\n    window.addEventListener('load', injectCodexTheme);\n    window.addEventListener('hashchange', () => setTimeout(injectCodexTheme, 120));\n    window.addEventListener('popstate', () => setTimeout(injectCodexTheme, 120));\n})();${telemetryJs}\n${SIG_END}\n`;
 }
 
 function inspectAsar(asarPath) {
@@ -509,7 +524,8 @@ function inspectAsar(asarPath) {
         syntaxValid,
         hasCN: preloadStr.includes('__ANTIGRAVITY_CHINESE_LOCALIZATION_START__'),
         hasCodexTheme: preloadStr.includes(SIG_START),
-        hasHotCssIpc: mainStr.includes(SIG_MAIN_START),
+        hasHotCssIpc: mainStr.includes('codex:read-hot-css'),
+        hasTelemetryRail: preloadStr.includes('codex-telemetry-rail-host') && mainStr.includes('codex:quota-snapshot'),
     };
 }
 
@@ -546,24 +562,29 @@ function hasCommand(cmd) {
 // Self-Update Engine (Git fast-forward OR single-shot proxy-aware HTTP for ZIP)
 // Fail-open: never blocks installation when offline or GitHub is unreachable
 // ============================================================================
-function downloadPairWithProxy(urlCss, urlJs, timeoutSec = 8) {
+function downloadPairWithProxy(urlCss, urlJs, timeoutSec = 8, urlTelemetry = null) {
     const tag = `${process.pid}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
     const tmpCss = path.join(os.tmpdir(), `codex_css_${tag}.tmp`);
     const tmpJs = path.join(os.tmpdir(), `codex_js_${tag}.tmp`);
+    const tmpTel = urlTelemetry ? path.join(os.tmpdir(), `codex_tel_${tag}.tmp`) : null;
     try {
         if (process.platform === 'win32') {
             const esc = (s) => s.replace(/'/g, "''");
             // Single PowerShell invocation: if first download fails (offline/blocked), immediately abort instead of waiting twice
-            const psCmd = [
+            const parts = [
                 '$ErrorActionPreference = "Stop";',
                 '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;',
                 '$ProgressPreference = "SilentlyContinue";',
                 `Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${esc(urlCss)}' -OutFile '${esc(tmpCss)}';`,
-                `Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${esc(urlJs)}' -OutFile '${esc(tmpJs)}'`,
-            ].join(' ');
+                `Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${esc(urlJs)}' -OutFile '${esc(tmpJs)}';`,
+            ];
+            if (urlTelemetry && tmpTel) {
+                parts.push(`Invoke-WebRequest -UseBasicParsing -TimeoutSec ${timeoutSec} -Uri '${esc(urlTelemetry)}' -OutFile '${esc(tmpTel)}'`);
+            }
+            const psCmd = parts.join(' ');
             spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCmd], {
                 stdio: 'ignore',
-                timeout: (timeoutSec * 2 + 6) * 1000,
+                timeout: (timeoutSec * 3 + 6) * 1000,
             });
         } else {
             const r1 = spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpCss, urlCss], {
@@ -571,20 +592,27 @@ function downloadPairWithProxy(urlCss, urlJs, timeoutSec = 8) {
                 timeout: (timeoutSec + 4) * 1000,
             });
             if (r1.status === 0) {
-                spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpJs, urlJs], {
+                const r2 = spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpJs, urlJs], {
                     stdio: 'ignore',
                     timeout: (timeoutSec + 4) * 1000,
                 });
+                if (r2.status === 0 && urlTelemetry && tmpTel) {
+                    spawnSync('curl', ['-fsSL', '--max-time', String(timeoutSec), '-o', tmpTel, urlTelemetry], {
+                        stdio: 'ignore',
+                        timeout: (timeoutSec + 4) * 1000,
+                    });
+                }
             }
         }
         return {
             remoteCss: fs.existsSync(tmpCss) ? fs.readFileSync(tmpCss, 'utf8') : null,
             remoteJs: fs.existsSync(tmpJs) ? fs.readFileSync(tmpJs, 'utf8') : null,
+            remoteTelemetry: tmpTel && fs.existsSync(tmpTel) ? fs.readFileSync(tmpTel, 'utf8') : null,
         };
     } catch {
-        return { remoteCss: null, remoteJs: null };
+        return { remoteCss: null, remoteJs: null, remoteTelemetry: null };
     } finally {
-        for (const f of [tmpCss, tmpJs]) {
+        for (const f of [tmpCss, tmpJs, tmpTel].filter(Boolean)) {
             if (fs.existsSync(f)) {
                 try { fs.unlinkSync(f); } catch {}
             }
@@ -606,6 +634,18 @@ function isValidPatchScript(text) {
     if (!text || text.length < 3000) return false;
     if (/^\s*<(!doctype|html)/i.test(text)) return false;
     if (!text.includes('patchAsarInPlace') || !text.includes('buildInjection')) return false;
+    try {
+        new vm.Script(text);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function isValidTelemetryScript(text) {
+    if (!text || text.length < 2000) return false;
+    if (/^\s*<(!doctype|html)/i.test(text)) return false;
+    if (!text.includes('normalizeQuotaSnapshot') || !text.includes('buildPreloadTelemetryInjection')) return false;
     try {
         new vm.Script(text);
         return true;
@@ -637,6 +677,7 @@ function trySelfUpdate(opts) {
         }
         const beforeJs = normalizeLf(fs.readFileSync(__filename, 'utf8'));
         const beforeCss = fs.existsSync(CSS_PATH) ? normalizeLf(fs.readFileSync(CSS_PATH, 'utf8')) : '';
+        const beforeTel = fs.existsSync(TELEMETRY_PATH) ? normalizeLf(fs.readFileSync(TELEMETRY_PATH, 'utf8')) : '';
         const env = { ...process.env };
         if (!env.HTTPS_PROXY && !env.https_proxy && !env.HTTP_PROXY && !env.http_proxy) {
             const sysProxy = getWindowsSystemProxyUrl();
@@ -654,11 +695,12 @@ function trySelfUpdate(opts) {
         if (pull.status === 0) {
             const afterJs = normalizeLf(fs.readFileSync(__filename, 'utf8'));
             const afterCss = fs.existsSync(CSS_PATH) ? normalizeLf(fs.readFileSync(CSS_PATH, 'utf8')) : '';
+            const afterTel = fs.existsSync(TELEMETRY_PATH) ? normalizeLf(fs.readFileSync(TELEMETRY_PATH, 'utf8')) : '';
             if (afterJs !== beforeJs && isValidPatchScript(afterJs)) {
                 console.log('[自更新] 已通过 Git 同步最新版安装引擎，正在无缝切换至新版执行...\n');
                 reexecUpdatedSelf();
-            } else if (afterCss !== beforeCss) {
-                console.log('[自更新] 已通过 Git 同步最新版 codex_theme.css。');
+            } else if (afterCss !== beforeCss || afterTel !== beforeTel) {
+                console.log('[自更新] 已通过 Git 同步最新版主题与监测模块。');
             } else {
                 console.log('[自更新] 当前主题与脚本已是最新版本。');
             }
@@ -670,25 +712,35 @@ function trySelfUpdate(opts) {
 
     // Case 2: ZIP download (no .git) -> single-shot proxy-aware raw HTTP sync with strict validation
     const cacheBust = `?t=${Date.now()}`;
-    const { remoteCss, remoteJs } = downloadPairWithProxy(
+    const { remoteCss, remoteJs, remoteTelemetry } = downloadPairWithProxy(
         `${SELF_RAW_BASE}/codex_theme.css${cacheBust}`,
         `${SELF_RAW_BASE}/patch_theme.js${cacheBust}`,
-        8
+        8,
+        `${SELF_RAW_BASE}/codex_telemetry_rail.js${cacheBust}`
     );
 
-    if (!remoteCss && !remoteJs) {
+    if (!remoteCss && !remoteJs && !remoteTelemetry) {
         console.log('[自更新] 无法连接 GitHub（或网络超时），继续使用本地版本完成安装。');
         return;
     }
 
     let cssUpdated = false;
     let jsUpdated = false;
+    let telUpdated = false;
 
     if (remoteCss && isValidThemeCss(remoteCss)) {
         const localCss = fs.existsSync(CSS_PATH) ? normalizeLf(fs.readFileSync(CSS_PATH, 'utf8')) : '';
         if (normalizeLf(remoteCss) !== localCss) {
             fs.writeFileSync(CSS_PATH, remoteCss, 'utf8');
             cssUpdated = true;
+        }
+    }
+
+    if (remoteTelemetry && isValidTelemetryScript(remoteTelemetry)) {
+        const localTel = fs.existsSync(TELEMETRY_PATH) ? normalizeLf(fs.readFileSync(TELEMETRY_PATH, 'utf8')) : '';
+        if (normalizeLf(remoteTelemetry) !== localTel) {
+            fs.writeFileSync(TELEMETRY_PATH, remoteTelemetry, 'utf8');
+            telUpdated = true;
         }
     }
 
@@ -701,10 +753,10 @@ function trySelfUpdate(opts) {
     }
 
     if (jsUpdated) {
-        console.log(`[自更新] 已自动更新安装引擎${cssUpdated ? '与主题样式' : ''}（通过语法校验），正在无缝切换至最新版执行...\n`);
+        console.log(`[自更新] 已自动更新安装引擎${(cssUpdated || telUpdated) ? '与主题模块' : ''}（通过语法校验），正在无缝切换至最新版执行...\n`);
         reexecUpdatedSelf();
-    } else if (cssUpdated) {
-        console.log('[自更新] 已自动更新最新版 codex_theme.css。');
+    } else if (cssUpdated || telUpdated) {
+        console.log(`[自更新] 已自动更新最新版 ${[cssUpdated && 'codex_theme.css', telUpdated && 'codex_telemetry_rail.js'].filter(Boolean).join(' & ')}。`);
     } else {
         console.log('[自更新] 当前主题与脚本已是最新版本。');
     }
@@ -922,8 +974,9 @@ function runInstall(opts) {
     if (mainBuf) {
         const rawMain = mainBuf.toString('utf8');
         const cleanMain = stripMainHotCss(rawMain);
-        if (opts.watchCss) {
-            const newMain = cleanMain + buildMainHotCssInjection(CSS_PATH);
+        const mainInjection = buildMainHotCssInjection(opts.watchCss ? CSS_PATH : null);
+        if (mainInjection) {
+            const newMain = cleanMain + mainInjection;
             new vm.Script(newMain);
             filePatches['dist/main.js'] = newMain;
         } else if (cleanMain !== rawMain) {
@@ -949,7 +1002,7 @@ function runInstall(opts) {
     console.log('\n========================================================');
     console.log('  [OK] 成功！Codex 视觉与排版主题已无损部署到 Antigravity');
     console.log(`       版本: v${info.version} | 体积: ${(stats.finalSize / 1024 / 1024).toFixed(2)} MB | 原生依赖保留: ${stats.unpackedCount} 项`);
-    console.log(`       中文汉化: ${info.hasCN ? '已启用' : '未启用'} | Codex 主题: 已启用 | 语法校验: 通过${info.hasHotCssIpc ? ' | IPC热重载: 已启用' : ''}`);
+    console.log(`       中文汉化: ${info.hasCN ? '已启用' : '未启用'} | Codex 主题: 已启用 | 右侧监测: ${info.hasTelemetryRail ? '已启用' : '未启用'} | 语法校验: 通过${info.hasHotCssIpc ? ' | IPC热重载: 已启用' : ''}`);
     if (installedPlugins.length > 0) {
         console.log(`       内置原生侧栏插件: ${installedPlugins.map(p => p.id).join(', ')}（重开后可在右侧插件面板启用）`);
     }
@@ -1021,7 +1074,8 @@ function runDoctor(opts) {
         console.log(`    安装文件   : ${info.asarPath}`);
         console.log(`    客户端版本 : v${info.version} (语法校验: ${info.syntaxValid ? '通过' : '异常'}, unpacked: ${info.unpackedCount})`);
         console.log(`    中文汉化   : ${info.hasCN ? '已启用' : '未安装'}`);
-        console.log(`    Codex 主题 : ${info.hasCodexTheme ? '已启用' : '未安装'}${info.hasHotCssIpc ? ' (IPC热重载已开)' : ''}\n`);
+        console.log(`    Codex 主题 : ${info.hasCodexTheme ? '已启用' : '未安装'}${info.hasHotCssIpc ? ' (IPC热重载已开)' : ''}`);
+        console.log(`    右侧监测   : ${info.hasTelemetryRail ? '已启用' : '未安装'}\n`);
     } catch (err) {
         console.log(`[1] 客户端探测失败: ${err.message}\n`);
     }
@@ -1184,4 +1238,17 @@ function main() {
     }
 }
 
-main();
+if (require.main === module) {
+    main();
+} else {
+    module.exports = {
+        readAsarHeader,
+        readAsarFile,
+        patchAsarInPlace,
+        stripCodexTheme,
+        stripMainHotCss,
+        buildMainHotCssInjection,
+        buildInjection,
+        inspectAsar,
+    };
+}

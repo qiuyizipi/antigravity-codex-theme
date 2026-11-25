@@ -2,15 +2,15 @@
 
 > 支持系统：Windows / macOS / Linux（零依赖纯 Node.js 原地无损封包，内置一键安装与还原脚本）
 >
-> 适用版本：Antigravity 2.x 全系列（已专门适配 v2.34.0+ `app.asar.unpacked` 原生依赖拆分架构）
+> 适用版本：Antigravity 2.x 全系列（已专门适配 v2.34.0+ / v2.35.1 `app.asar.unpacked` 原生依赖拆分架构）
 >
-> 设计目标：逐像素对齐本地 OpenAI Codex 桌面端的视觉规范，彻底根治 Windows Electron 下 Antigravity 2.34+ 字体发白、350 细字重断层与排版拥挤问题，呈现纯白无缝画布、`#F8F9FC` 清亮侧边栏、实墨 16px/1.66 正文与两档强调黑度层次。
+> 设计目标：逐像素对齐本地 OpenAI Codex 桌面端的视觉规范，彻底根治 Windows Electron 下 Antigravity 2.34+ 字体发白、350 细字重断层与排版拥挤问题，呈现纯白无缝画布、`#F8F9FC` 清亮侧边栏、实墨 16px/1.66 正文、两档强调黑度层次与右侧可拖动实时监测面板。
 >
 > 安全承诺：纯 Node.js 原地修补 Chromium Pickle ASAR 索引，完整保留全部 `unpacked` 原生二进制依赖，写入前执行 `vm.Script` 语法校验，并自动备份支持秒级无损还原。
 
 ---
 
-## 核心特性（v4.8 开箱即用套装：Codex 实墨主题 + 双原生侧栏插件）
+## 核心特性（v4.9 开箱即用套装：Codex 实墨主题 + 可拖动实时监测 + 双原生侧栏插件）
 
 1. 浅色 / 深色 / 跟随系统实时无缝切换与切号自愈
 - 所有颜色全面变量化（`--codex-*`），同步覆盖 Antigravity 原生 `--foreground` / `--secondary-foreground` / `--muted-foreground` / `--shell` / `--onyx-*` 语义令牌，完整兼容 `body.dark`（`html:has(> body.dark)`）。
@@ -27,23 +27,26 @@
 - 移除对话区外圈留白与卡片圆角，主对话流与底部输入框严格对齐至 `768px`（扣内边距后净文字宽约 `725px`，1:1 对齐 Codex 实测 `728px`）。
 - 底部输入框重构为单层 `22px` 圆角与极细浅灰边框，行内代码胶囊轻盈低干扰。
 
-4. 清亮净化侧边栏
-- 侧边栏采用 `#F8F9FC` 清亮冰白底色、`14px` 舒适字号、`30px` 轻盈行高与 `3.5px` 极细滚动条。
-- 会话时间戳默认隐藏，鼠标悬停时平滑显示，界面干净克制。
+4. Codex 层级清亮侧边栏
+- 侧边栏采用 `#F8F9FC` 清亮冰白底色、`3.5px` 极细滚动条与悬停时间戳；项目文件夹标题锁定 `15px / 600` 纯黑/纯白高对比锚点，子对话缩进对齐至 `13.5px / 400`（`#262B33` / `#D5D9E0`），主次层级一目了然。
 
-5. 零依赖原地无损 ASAR 引擎（支持 v2.34.0+）
-- 摒弃会破坏 `app.asar.unpacked` 标记的传统全量解包重封，直接用内置 Node.js 原地修补 `dist/preload.js`。
+5. 右侧可拖动实时监测面板（对话中途随时看额度）
+- 宽屏下常驻停靠在对话右侧留白区，集中展示所用模型、生成速度（`t/s` 与首字延迟）、上下文窗口环形进度、本次/累计缓存命中率与读写量，以及按共享配额池智能合并的模型额度与刷新倒计时（支持在 AI 回复过程中直接查看，不受底栏锁定影响），同时自动隐藏底部输入框里重复的监控图标。
+- 支持自由拖动定位与位置记忆（按左右半屏自动贴边适配窗口缩放），提供双击/一键归位、收起胶囊与窄屏/打开右侧栏时自动避让。
+
+6. 零依赖原地无损 ASAR 引擎（支持 v2.34.0+）
+- 摒弃会破坏 `app.asar.unpacked` 标记的传统全量解包重封，直接用内置 Node.js 原地修补 `dist/preload.js` 与 `dist/main.js`。
 - 完整保留官方全部 377+ 个 `unpacked` 原生依赖，不依赖 Python，也不需要联网下载 `@electron/asar`。
 
-6. 运行时自动更新（下载一次，永久免重复下载）
-- 无论通过 `git clone` 还是网页下载 ZIP，每次双击安装脚本时都会自动联网检查 `qiuyizipi/antigravity-codex-theme` 的最新 `patch_theme.js` 和 `codex_theme.css`（自动兼容 Windows 系统代理，无需 Git）。
+7. 运行时自动更新（下载一次，永久免重复下载）
+- 无论通过 `git clone` 还是网页下载 ZIP，每次双击安装脚本时都会自动联网检查 `qiuyizipi/antigravity-codex-theme` 的最新 `patch_theme.js`、`codex_theme.css` 和 `codex_telemetry_rail.js`（自动兼容 Windows 系统代理，无需 Git）。
 - 若检测到新版脚本，会先通过 `vm.Script` 语法校验再替换，并自动无缝切换至新版继续执行；若处于离线或无法访问 GitHub 状态，自动降级使用本地文件完成安装（也支持加 `--no-update` 跳过联网检查）。
 
-7. 一键联动最新中文汉化
-- 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex v4.6 主题。
+8. 一键联动最新中文汉化
+- 内置 `--with-cn` 一键联动模式：自动拉取或更新开源汉化仓库 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 并执行汉化，随后无损叠加注入本仓库的 Codex 主题。
 - 客户端升级后只需双击一次即可同时完成“最新中文汉化 + Codex 主题”全套部署。
 
-8. 内置双原生右侧栏插件（零外部依赖、不改 `app.asar`、官方更新不丢）
+9. 内置双原生右侧栏插件（零外部依赖、不改 `app.asar`、官方更新不丢）
 - **配置总览 (`codex-config-hub`)**：专治 Antigravity 原生界面「全局规则、Skills、MCP、插件入口藏太深、配完不知道有没有生效」痛点。在右侧边栏一屏查看与在线编辑 `AGENTS.md` / `MEMORY.md`（保存即显示字节变更与生效回执）、搜索全部 Skills、查看脱敏 MCP 并测本地端口连通性、浏览已装插件及一键直达底层目录。
 - **任务脉搏 (`task-pulse` v2.1)**：零干扰纯只读长任务监工侧栏。0 Hook / 0 规则注入不介入对话链路，支持任意体积大对话增量解析、ETag 零开销缓存、窗口失焦自动休眠、单行紧凑动态与精准卡住/死循环检测。
 - 同时提供 `双击查看全局配置与生效状态.bat`（`node patch_theme.js --doctor`），终端一秒核验全部配置与补丁状态。
@@ -120,10 +123,13 @@ antigravity-codex-theme/
 ├── install.sh                        # macOS / Linux 安装入口（支持 --with-cn）
 ├── uninstall.sh                      # macOS / Linux 还原入口
 ├── patch_theme.js                    # 零依赖 Node.js 原地无损 ASAR 注入、插件部署与体检引擎
-├── codex_theme.css                   # v4.6 Solid-Ink Light & Dark 双色 Codex 样式表
+├── codex_telemetry_rail.js           # 右侧可拖动实时监测面板与本地配额/遥测桥接模块
+├── codex_theme.css                   # v4.9 Solid-Ink Light & Dark 双色 Codex 样式表
 ├── plugins/
 │   ├── codex-config-hub/             # 原生右侧栏「配置总览 (Config Hub)」插件
 │   └── task-pulse/                   # 原生右侧栏「任务脉搏 (Task Pulse v2.1)」插件
+├── tests/
+│   └── telemetry.test.mjs            # 遥测与临时 ASAR 往返单测
 ├── LICENSE                           # MIT 开源协议
 └── README.md                         # 说明文档
 ```
@@ -133,4 +139,4 @@ antigravity-codex-theme/
 ## 致谢与声明
 
 - 中文汉化能力通过一键脚本在线联动 [Silas-02/antigravity-desktop-cn](https://github.com/Silas-02/antigravity-desktop-cn) 实现，本仓库不直接分发第三方汉化源码，版权归原作者所有。
-- 本仓库内的 Codex 视觉主题样式表（`codex_theme.css`）、原地无损 ASAR 注入引擎（`patch_theme.js`）与内置原生侧栏插件（`plugins/codex-config-hub/`、`plugins/task-pulse/`）均采用 MIT 协议开源。
+- 本仓库内的 Codex 视觉主题样式表（`codex_theme.css`）、实时监测模块（`codex_telemetry_rail.js`）、原地无损 ASAR 注入引擎（`patch_theme.js`）与内置原生侧栏插件（`plugins/codex-config-hub/`、`plugins/task-pulse/`）均采用 MIT 协议开源。
