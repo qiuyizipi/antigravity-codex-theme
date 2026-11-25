@@ -218,6 +218,7 @@ test('generated main & preload telemetry scripts pass vm.Script syntax validatio
     assert.ok(preloadScript.includes('ctx-ring-arc'));
     assert.ok(preloadScript.includes('docListenersBound'));
     assert.ok(preloadScript.includes('quota-active-windows'));
+    assert.ok(preloadScript.includes('查看其他配额'));
     assert.ok(mainNoWatch.includes('forceRefresh'));
 });
 

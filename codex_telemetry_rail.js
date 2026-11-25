@@ -1370,7 +1370,7 @@ function buildPreloadTelemetryInjection() {
                     background: var(--ok-bg);
                     border-radius: 11px;
                     padding: 8px 10px;
-                    margin-bottom: 8px;
+                    margin-bottom: 0;
                     transition: background-color 0.2s ease;
                 }
                 .quota-hero.warn { background: var(--warn-bg); }
@@ -1464,6 +1464,7 @@ function buildPreloadTelemetryInjection() {
                 .bucket-list {
                     display: grid;
                     gap: 6px;
+                    margin-top: 8px;
                 }
                 .bucket-item {
                     display: flex;
@@ -2112,7 +2113,7 @@ function buildPreloadTelemetryInjection() {
                 }
 
                 els.bucketList.innerHTML = '';
-                const defaultCap = 4;
+                const defaultCap = 0;
                 const limit = showAllBuckets ? extraRows.length : defaultCap;
                 const shown = extraRows.slice(0, limit);
                 if (shown.length > 0) {
@@ -2159,7 +2160,7 @@ function buildPreloadTelemetryInjection() {
                 if (extraRows.length > defaultCap) {
                     els.btnMoreBuckets.classList.remove('hidden');
                     els.btnMoreBuckets.setAttribute('aria-expanded', showAllBuckets ? 'true' : 'false');
-                    els.moreBucketsText.textContent = showAllBuckets ? '收起其余项' : `展开其余 ${extraRows.length - defaultCap} 项`;
+                    els.moreBucketsText.textContent = showAllBuckets ? '收起其他配额' : `查看其他配额 (${extraRows.length})`;
                 } else {
                     els.btnMoreBuckets.classList.add('hidden');
                 }
