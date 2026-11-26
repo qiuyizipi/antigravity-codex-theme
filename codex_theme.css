@@ -3,7 +3,7 @@
    逐像素对齐 OpenAI Codex 桌面端实机观感：
    - 16px / 1.66 饱满正文 + 14px 左侧边栏（对齐 Codex 实测 8px/7px 缩略字高）
    - 灰度平滑抗锯齿（消除 Windows ClearType 7.8 彩边发毛，还原 Codex 1.7 柔和圆润笔画）
-   - 768px 容器（扣内边距后净文字宽 ~725px，1:1 对齐 Codex 728px 阅读列宽）
+   - 跟随 Antigravity 官方宽屏阅读列宽，正文与底部输入框自然齐边
    - 清亮 #F8F9FC 侧边栏与顶栏 + 柔和炭黑 #1F2328 正文 / #374151 侧栏字，告别死黑扎眼与发白发虚
    - 完整支持浅色 / 深色 (含 html:has(> body.dark)) / 跟随系统实时无缝切换
    ========================================================================== */
@@ -286,8 +286,6 @@ body:not([data-agy-font="inter"]) {
     --vscode-sideBar-background: var(--codex-sidebar) !important;
     --vscode-titleBar-activeBackground: var(--codex-titlebar-solid) !important;
 
-    --max-conversation-width: 768px !important;
-
     font-family: var(--font-sans) !important;
     font-weight: 400 !important;
     font-variation-settings: normal !important;
@@ -514,14 +512,8 @@ main,
     background-color: var(--codex-bg) !important;
 }
 
-/* 约束正文最大阅读宽度至 768px（扣内边距后净文字宽 ~725px，1:1 对齐 Codex 728px） */
+/* 跟随新版 Antigravity 原生宽屏输出布局，仅保留底部缓冲留白 */
 [data-testid="autoscroll-viewport"] > div {
-    max-width: 768px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    width: 100% !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
     padding-bottom: 44px !important;
 }
 
@@ -914,7 +906,7 @@ button:has(> [class*="tabular-nums"]) {
     color: var(--codex-text-subtle) !important;
 }
 
-/* 10. 底部输入框区域 (Agent Input Box) - 跟随原生 --max-conversation-width (720px) 严格齐边 */
+/* 10. 底部输入框区域 (Agent Input Box) - 跟随原生 --max-conversation-width 自然齐边 */
 [data-testid="agent-input-box"] {
     background-color: transparent !important;
     border: none !important;

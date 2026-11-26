@@ -2354,14 +2354,24 @@ function buildPreloadTelemetryInjection() {
             }
 
             const vr = view.getBoundingClientRect();
+            const rawCssW = getComputedStyle(view).getPropertyValue('--max-conversation-width')
+                || getComputedStyle(document.documentElement).getPropertyValue('--max-conversation-width');
+            const parsedMaxW = parseFloat(rawCssW);
+            const fallbackMaxW = (Number.isFinite(parsedMaxW) && parsedMaxW > 320) ? parsedMaxW : 960;
+            const flowEl = view.querySelector('[data-testid="autoscroll-viewport"] > div');
             const boxEl = view.querySelector('#antigravity\\.agentSidePanelInputBox, [data-testid="agent-input-box"] .surface-composer, [data-testid="agent-input-box"]');
-            let contentRight = vr.left + Math.floor((vr.width + Math.min(vr.width, 768)) / 2);
-            if (boxEl && isVisible(boxEl)) {
-                const br = boxEl.getBoundingClientRect();
-                if (br.width > 120 && br.width < vr.width - 80) {
-                    contentRight = br.right;
+            let measuredRight = null;
+            for (const candidate of [flowEl, boxEl]) {
+                if (candidate && isVisible(candidate)) {
+                    const br = candidate.getBoundingClientRect();
+                    if (br.width > 120 && br.width < vr.width - 80) {
+                        measuredRight = measuredRight === null ? br.right : Math.max(measuredRight, br.right);
+                    }
                 }
             }
+            let contentRight = measuredRight !== null
+                ? measuredRight
+                : (vr.left + Math.floor((vr.width + Math.min(vr.width, fallbackMaxW)) / 2));
             contentRight = Math.min(vr.right, contentRight);
             const freeRight = Math.floor(vr.right - contentRight);
             const canDock = !userCollapsed && freeRight >= 236 && vr.height >= 260;
