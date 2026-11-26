@@ -675,13 +675,13 @@ function buildMainTelemetryInjection(hotCssPath) {
                 const needFetch = Boolean(force)
                     || rawQuotaCache.key !== ep.key
                     || (!rawQuotaCache.userStatus && !rawQuotaCache.quotaSummary)
-                    || (now - rawQuotaCache.fetchedAt > 25000);
+                    || (now - rawQuotaCache.fetchedAt > 10000);
 
                 if (needFetch) {
                     if (!quotaInflight || force) {
                         quotaInflight = Promise.allSettled([
                             callLsRpc(ep, 'GetUserStatus', {}),
-                            callLsRpc(ep, 'RetrieveUserQuotaSummary', { request: {}, forceRefresh: Boolean(force) }),
+                            callLsRpc(ep, 'RetrieveUserQuotaSummary', { request: {}, forceRefresh: true }),
                         ]).then(([rUser, rSummary]) => {
                             const userStatus = rUser.status === 'fulfilled' ? rUser.value : null;
                             const quotaSummary = rSummary.status === 'fulfilled' ? rSummary.value : null;
@@ -888,6 +888,11 @@ function buildPreloadTelemetryInjection() {
         let lastQuotaAt = 0;
         let lastQuotaModelHint = '';
         let lastMetricsAt = 0;
+        let lastRequestCount = 0;
+        let quotaFetching = false;
+        let reqRefreshTimer = null;
+        let turnEndTimer = null;
+        let lastCountdownTickAt = 0;
         let wasRunning = false;
         let metricsIpcChannel = 'ag-ctx:metrics';
         let currentTheme = 'light';
@@ -1891,7 +1896,36 @@ function buildPreloadTelemetryInjection() {
                         scheduleLayout(true);
                     }
                 });
+                const onWindowWake = () => {
+                    if (document.hidden) return;
+                    if (Date.now() - lastQuotaAt >= 10000) {
+                        void fetchMetrics(false);
+                        void fetchQuota(true);
+                    }
+                };
+                document.addEventListener('visibilitychange', onWindowWake);
+                window.addEventListener('focus', onWindowWake);
             }
+        }
+
+        function updateQuotaFreshnessLabel() {
+            if (!els || !els.quotaUpdated) return;
+            if (quotaFetching) {
+                els.quotaUpdated.textContent = '更新中…';
+                return;
+            }
+            if (lastQuota && lastQuota.ok && lastQuota.fetchedAt) {
+                const ageSec = Math.max(0, Math.floor((Date.now() - lastQuota.fetchedAt) / 1000));
+                if (ageSec < 5) els.quotaUpdated.textContent = '刚刚更新';
+                else if (ageSec < 60) els.quotaUpdated.textContent = ageSec + '秒前';
+                else els.quotaUpdated.textContent = Math.floor(ageSec / 60) + '分钟前';
+                return;
+            }
+            if (lastQuota && lastQuota.reason === 'offline') {
+                els.quotaUpdated.textContent = '等待服务';
+                return;
+            }
+            els.quotaUpdated.textContent = '实时同步';
         }
 
         function ensureMounted() {
@@ -2194,6 +2228,7 @@ function buildPreloadTelemetryInjection() {
                 }
             }
             els.pillText.textContent = pillParts.length ? pillParts.join(' · ') : '实时监测';
+            updateQuotaFreshnessLabel();
         }
 
         function updateLayout(force) {
@@ -2206,8 +2241,11 @@ function buildPreloadTelemetryInjection() {
                 activeConvId = convId;
                 lastMetrics = null;
                 lastMetricsAt = 0;
+                lastRequestCount = 0;
                 lastQuotaModelHint = '';
                 wasRunning = false;
+                if (reqRefreshTimer) { clearTimeout(reqRefreshTimer); reqRefreshTimer = null; }
+                if (turnEndTimer) { clearTimeout(turnEndTimer); turnEndTimer = null; }
                 renderData();
                 void fetchMetrics(true);
                 void fetchQuota(false);
@@ -2368,11 +2406,30 @@ function buildPreloadTelemetryInjection() {
                     lastMetrics = res;
                     const nowRunning = Boolean(res.running);
                     const nextModelHint = (res.context && res.context.model) || '';
+                    const nextReqCount = (res.cache && res.cache.session && typeof res.cache.session.requests === 'number')
+                        ? res.cache.session.requests
+                        : 0;
+
                     if (nextModelHint && nextModelHint !== lastQuotaModelHint) {
                         void fetchQuota(false);
-                    } else if (wasRunning && !nowRunning) {
-                        setTimeout(() => { void fetchQuota(true); }, 1100);
                     }
+                    if (wasRunning && !nowRunning) {
+                        if (reqRefreshTimer) { clearTimeout(reqRefreshTimer); reqRefreshTimer = null; }
+                        if (turnEndTimer) clearTimeout(turnEndTimer);
+                        turnEndTimer = setTimeout(() => {
+                            turnEndTimer = null;
+                            void fetchQuota(true);
+                        }, 1100);
+                    } else if (lastRequestCount > 0 && nextReqCount > lastRequestCount && (Date.now() - lastQuotaAt >= 8000)) {
+                        if (!reqRefreshTimer) {
+                            reqRefreshTimer = setTimeout(() => {
+                                reqRefreshTimer = null;
+                                void fetchQuota(true);
+                            }, 1200);
+                        }
+                    }
+
+                    lastRequestCount = nextReqCount;
                     wasRunning = nowRunning;
                     renderData();
                 }
@@ -2381,6 +2438,8 @@ function buildPreloadTelemetryInjection() {
 
         async function fetchQuota(force) {
             lastQuotaAt = Date.now();
+            quotaFetching = true;
+            updateQuotaFreshnessLabel();
             try {
                 const { uiModel } = findActiveViewAndId();
                 const modelHint = (lastMetrics && lastMetrics.context && lastMetrics.context.model) || uiModel || '';
@@ -2388,9 +2447,13 @@ function buildPreloadTelemetryInjection() {
                 const res = await invokeIpc('codex:quota-snapshot', modelHint, Boolean(force));
                 if (res) {
                     lastQuota = res;
+                    lastCountdownTickAt = Date.now();
                     renderData();
                 }
-            } catch {}
+            } catch {} finally {
+                quotaFetching = false;
+                updateQuotaFreshnessLabel();
+            }
         }
 
         function boot() {
@@ -2412,10 +2475,16 @@ function buildPreloadTelemetryInjection() {
             setInterval(() => {
                 if (document.hidden) return;
                 updateLayout(false);
+                updateQuotaFreshnessLabel();
                 const now = Date.now();
                 const mInterval = wasRunning ? 1200 : 2500;
+                const qInterval = wasRunning ? 12000 : 20000;
                 if (now - lastMetricsAt >= mInterval) void fetchMetrics(false);
-                if (now - lastQuotaAt >= 30000) void fetchQuota(false);
+                if (now - lastQuotaAt >= qInterval) void fetchQuota(false);
+                if (now - lastCountdownTickAt >= 15000 && lastQuota && lastQuota.ok) {
+                    lastCountdownTickAt = now;
+                    renderData();
+                }
             }, 1000);
         }
 

@@ -219,7 +219,11 @@ test('generated main & preload telemetry scripts pass vm.Script syntax validatio
     assert.ok(preloadScript.includes('docListenersBound'));
     assert.ok(preloadScript.includes('quota-active-windows'));
     assert.ok(preloadScript.includes('查看其他配额'));
-    assert.ok(mainNoWatch.includes('forceRefresh'));
+    assert.ok(preloadScript.includes('visibilitychange'));
+    assert.ok(preloadScript.includes('lastRequestCount'));
+    assert.ok(preloadScript.includes('刚刚更新'));
+    assert.ok(mainNoWatch.includes('forceRefresh: true'));
+    assert.ok(mainNoWatch.includes('10000'));
 });
 
 test('normalizeQuotaSnapshot unwraps RetrieveUserQuotaSummary.response with both 5h and weekly windows', () => {
