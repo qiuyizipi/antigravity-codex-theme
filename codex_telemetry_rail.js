@@ -122,11 +122,11 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
     const isWindowOnlyName = (name) => {
         const t = cleanText(name);
         if (!t) return true;
-        return /^(?:5\s*-?\s*h(?:our)?s?(?:\s+limit|\s+quota|\s+window)?|five[\s_-]*hour(?:\s+limit)?|\b7\s*-?\s*d(?:ays?)?|1\s*-?\s*w(?:eek)?|week(?:ly)?(?:\s+limit|\s+quota|\s+window)?|daily(?:\s+limit)?|monthly(?:\s+limit)?|5小时(?:额度|配额|限制|窗口)?|周额度|每周(?:额度|配额|限制)?|日额度|月额度)$/i.test(t);
+        return /^(?:5\s*-?\s*h(?:our)?s?|five[\s_-]*hour|7\s*-?\s*d(?:ays?)?|1\s*-?\s*w(?:eek)?|week(?:ly)?|daily|monthly|5小时|周|每周|日|月)(?:\s*(?:limit|quota|window|remaining|used|usage|cap|额度|配额|限制|窗口|剩余|已用))*$/i.test(t);
     };
     const stripWindowSuffix = (name) => {
         return cleanText(name)
-            .replace(/\s*[·|\-–—(（\[]*\s*(?:5\s*-?\s*h(?:our)?s?(?:\s+limit|\s+quota|\s+window)?|five[\s_-]*hour(?:\s+limit)?|week(?:ly)?(?:\s+limit|\s+quota|\s+window)?|7\s*-?\s*d(?:ays?)?|1\s*-?\s*w(?:eek)?|daily(?:\s+limit)?|monthly(?:\s+limit)?|5小时(?:额度|配额|限制|窗口)?|周额度|每周(?:额度|配额|限制)?|日额度|月额度)\s*[)）\]]*\s*$/i, '')
+            .replace(/\s*[·|\-–—(（\[]*\s*(?:5\s*-?\s*h(?:our)?s?|five[\s_-]*hour|week(?:ly)?|7\s*-?\s*d(?:ays?)?|1\s*-?\s*w(?:eek)?|daily|monthly|5小时|周额度|每周|日额度|月额度)(?:\s*(?:limit|quota|window|remaining|used|usage|cap|额度|配额|限制|窗口|剩余|已用))*\s*[)）\]]*\s*$/i, '')
             .trim();
     };
     const windowRank = (winLabel) => {
@@ -155,12 +155,10 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
         || ''
     ) || null;
 
-    // 1. 解析套餐点数 / AI Credits（过滤全 0 历史空字段）
+    // 1. 解析弹性点数 (AI Credits)；彻底忽略旧版 Windsurf Prompt/Flow 历史字段
     const credits = [];
     if (planStatus) {
         const creditSpecs = [
-            ['Prompt 额度', planStatus.usedPromptCredits, planStatus.availablePromptCredits],
-            ['Flow 额度', planStatus.usedFlowCredits, planStatus.availableFlowCredits],
             ['弹性额度 (AI Credits)', planStatus.usedFlexCredits, planStatus.availableFlexCredits],
         ];
         for (const [label, rawUsed, rawAvail] of creditSpecs) {
@@ -226,7 +224,12 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
     const groups = Array.isArray(qs.groups) ? qs.groups : [];
     for (const g of groups) {
         if (!g || typeof g !== 'object') continue;
-        const groupName = cleanText(g.displayName || g.description);
+        const rawGroupName = cleanText(g.displayName || g.description);
+        const strippedGroupName = isWindowOnlyName(rawGroupName)
+            ? ''
+            : (stripWindowSuffix(rawGroupName) || rawGroupName);
+        const groupProvider = detectProviderBucket([g.displayName, g.description, g.groupId, g.id].map(cleanText).join(' '));
+        const groupName = strippedGroupName || (groupProvider !== '其他' ? groupProvider : '');
         const subBuckets = Array.isArray(g.buckets) ? g.buckets : [];
         if (subBuckets.length > 0) {
             const parsedGroupBuckets = [];
@@ -236,10 +239,18 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
                 const { remainingPct, usedPct } = toPctPair(frac);
                 const rawBName = cleanText(b.displayName || b.description);
                 let winLabel = normalizeWindowLabel(b.refreshWindowLabel || b.window, b.displayName, b.description, b.bucketId);
-                const strippedBName = stripWindowSuffix(rawBName);
-                const label = (groupName && (!rawBName || isWindowOnlyName(rawBName)))
-                    ? groupName
-                    : (strippedBName || rawBName || groupName || '模型配额池');
+                const strippedBName = isWindowOnlyName(rawBName) ? '' : stripWindowSuffix(rawBName);
+                let label = '';
+                if (!rawBName || isWindowOnlyName(rawBName)) {
+                    if (groupName) {
+                        label = groupName;
+                    } else {
+                        const inferred = detectProviderBucket([rawBName, b.description, b.bucketId, g.displayName, g.description, g.groupId].map(cleanText).join(' '));
+                        label = inferred !== '其他' ? inferred : '模型配额池';
+                    }
+                } else {
+                    label = strippedBName || rawBName || groupName || '模型配额池';
+                }
                 parsedGroupBuckets.push({
                     label,
                     groupKey: (groupName || label).toLowerCase(),
@@ -265,6 +276,7 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
                         item.windowLabel = (rMs - nowMs) > 18 * 3600 * 1000 ? '周额度' : '5小时';
                     }
                 }
+                parsedGroupBuckets.sort((a, b) => windowRank(a.windowLabel) - windowRank(b.windowLabel));
             }
             for (const item of parsedGroupBuckets) pushBucket(item);
         } else if (groupName) {
@@ -292,15 +304,20 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
     }
 
     const topBuckets = Array.isArray(qs.buckets) ? qs.buckets : [];
+    const parsedTopBuckets = [];
     for (const b of topBuckets) {
         if (!b || typeof b !== 'object') continue;
         const rawName = cleanText(b.displayName || b.description || b.refreshWindowLabel || b.window);
-        if (!rawName) continue;
+        if (!rawName && !b.bucketId) continue;
         const winLabel = normalizeWindowLabel(b.refreshWindowLabel || b.window, b.displayName, b.description, b.bucketId);
-        const label = stripWindowSuffix(rawName) || rawName;
+        let label = isWindowOnlyName(rawName) ? '' : (stripWindowSuffix(rawName) || rawName);
+        if (!label) {
+            const inferred = detectProviderBucket([rawName, b.description, b.bucketId].map(cleanText).join(' '));
+            label = inferred !== '其他' ? inferred : (rawName || '模型配额池');
+        }
         const frac = readQuotaFraction(b, true);
         const { remainingPct, usedPct } = toPctPair(frac);
-        pushBucket({
+        parsedTopBuckets.push({
             label,
             groupKey: label.toLowerCase(),
             bucketId: cleanText(b.bucketId) || null,
@@ -317,6 +334,19 @@ function normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, currentModelLabe
             source: 'summary',
         });
     }
+    if (parsedTopBuckets.length > 1) {
+        const groupOrder = new Map();
+        for (const item of parsedTopBuckets) {
+            if (!groupOrder.has(item.groupKey)) groupOrder.set(item.groupKey, groupOrder.size);
+        }
+        parsedTopBuckets.sort((a, b) => {
+            const ga = groupOrder.get(a.groupKey) ?? 0;
+            const gb = groupOrder.get(b.groupKey) ?? 0;
+            if (ga !== gb) return ga - gb;
+            return windowRank(a.windowLabel) - windowRank(b.windowLabel);
+        });
+    }
+    for (const item of parsedTopBuckets) pushBucket(item);
 
     // 4. 模型家族去重；仅在官方 summary 未返回桶时，按共享配额特征自动合并成配额池
     const dedupedModels = [];
@@ -1099,12 +1129,25 @@ function buildPreloadTelemetryInjection() {
                     border: 1px solid var(--border);
                     border-radius: 16px;
                     box-shadow: var(--shadow);
-                    padding: 12px 14px 13px;
+                    padding: 12px 12px 13px 14px;
                     overflow-y: auto;
                     overflow-x: hidden;
                     scrollbar-width: thin;
                     transition: box-shadow 0.18s ease, border-color 0.18s ease;
                     user-select: none;
+                }
+                .rail-card::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .rail-card::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .rail-card::-webkit-scrollbar-thumb {
+                    background: rgba(120, 130, 145, 0.25);
+                    border-radius: 999px;
+                }
+                .rail-card::-webkit-scrollbar-thumb:hover {
+                    background: rgba(120, 130, 145, 0.45);
                 }
                 .rail-card.dragging {
                     box-shadow: var(--shadow-drag);
@@ -1477,6 +1520,8 @@ function buildPreloadTelemetryInjection() {
                     justify-content: space-between;
                     gap: 8px;
                     font-size: 11px;
+                    min-width: 0;
+                    width: 100%;
                 }
                 .bucket-name {
                     color: var(--muted);
@@ -1493,7 +1538,7 @@ function buildPreloadTelemetryInjection() {
                     flex: none;
                 }
                 .mini-bar {
-                    width: 38px;
+                    width: 34px;
                     height: 4px;
                     border-radius: 999px;
                     background: var(--track);
@@ -1512,8 +1557,10 @@ function buildPreloadTelemetryInjection() {
                     font-size: 10.5px;
                     font-weight: 550;
                     font-variant-numeric: tabular-nums;
-                    min-width: 34px;
+                    min-width: 32px;
                     text-align: right;
+                    white-space: nowrap;
+                    flex: none;
                 }
                 .credit-stat {
                     color: var(--muted);

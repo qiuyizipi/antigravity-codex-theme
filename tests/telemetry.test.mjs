@@ -90,8 +90,9 @@ test('normalizeQuotaSnapshot deduplicates model variants, matches active model, 
     assert.equal(snap.activeQuota.label, 'Gemini 4 Neon');
     assert.equal(snap.activeQuota.remainingPct, 78);
     assert.equal(snap.activeQuota.usedPct, 22);
-    assert.equal(snap.credits.length, 2);
-    assert.equal(snap.credits[0].available, 880);
+    // Legacy Windsurf Prompt/Flow fields are ignored; only positive AI Flex credits remain
+    assert.equal(snap.credits.length, 1);
+    assert.equal(snap.credits[0].available, 450);
     // Official summary buckets take strict priority: should NOT append Gemini 4 Hydrogen as extra model bucket
     assert.equal(snap.buckets.length, 2);
     assert.ok(snap.buckets.some((b) => b.label === 'Claude / 第三方池' && b.usedPct === 60));
@@ -290,6 +291,77 @@ test('normalizeQuotaSnapshot unwraps RetrieveUserQuotaSummary.response with both
     const flatSnap = telemetry.normalizeQuotaSnapshot({}, flatResp, 'Gemini 4 Neon');
     assert.equal(flatSnap.activeQuota.label, 'Gemini');
     assert.deepEqual(flatSnap.activeWindows.map((w) => w.windowLabel), ['5小时', '周额度']);
+});
+
+test('normalizeQuotaSnapshot normalizes "Five Hour/Weekly Limit Remaining" buckets, drops legacy Prompt/Flow credits, and orders 5h before weekly', () => {
+    const userStatusRes = {
+        userStatus: {
+            planStatus: {
+                planInfo: { planName: 'Google AI Ultra' },
+                usedPromptCredits: 10,
+                availablePromptCredits: 990,
+                usedFlowCredits: 0,
+                availableFlowCredits: 100,
+                usedFlexCredits: 0,
+                availableFlexCredits: 0,
+            },
+        },
+    };
+    const quotaSummaryRes = {
+        response: {
+            groups: [
+                {
+                    displayName: 'Gemini',
+                    buckets: [
+                        {
+                            bucketId: 'gemini_weekly',
+                            displayName: 'Weekly Limit Remaining',
+                            remainingFraction: 0.92,
+                            resetTime: '2026-11-30T00:00:00Z',
+                        },
+                        {
+                            bucketId: 'gemini_5h',
+                            displayName: 'Five Hour Limit Remaining',
+                            remainingFraction: 1,
+                            resetTime: '2026-11-26T20:00:00Z',
+                        },
+                    ],
+                },
+                {
+                    displayName: 'Claude',
+                    buckets: [
+                        {
+                            bucketId: 'claude_weekly',
+                            displayName: 'Weekly Limit Remaining',
+                            remainingFraction: 1,
+                            resetTime: '2026-11-30T00:00:00Z',
+                        },
+                        {
+                            bucketId: 'claude_5h',
+                            displayName: 'Five Hour Limit Remaining',
+                            remainingFraction: 1,
+                            resetTime: '2026-11-26T20:00:00Z',
+                        },
+                    ],
+                },
+            ],
+        },
+    };
+
+    const snap = telemetry.normalizeQuotaSnapshot(userStatusRes, quotaSummaryRes, 'Gemini 3.1 Pro');
+    assert.equal(snap.ok, true);
+    assert.deepEqual(snap.credits, []);
+    assert.equal(snap.activeQuota.label, 'Gemini');
+    assert.deepEqual(snap.activeWindows.map((w) => [w.label, w.windowLabel]), [
+        ['Gemini', '5小时'],
+        ['Gemini', '周额度'],
+    ]);
+    assert.deepEqual(snap.buckets.map((b) => [b.label, b.windowLabel]), [
+        ['Gemini', '5小时'],
+        ['Gemini', '周额度'],
+        ['Claude', '5小时'],
+        ['Claude', '周额度'],
+    ]);
 });
 
 test('non-destructive temp ASAR patch and strip round-trip preserves syntax and unpacked count', { skip: !fs.existsSync(LIVE_ASAR) }, () => {
