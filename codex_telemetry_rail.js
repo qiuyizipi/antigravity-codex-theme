@@ -1050,7 +1050,20 @@ function buildPreloadTelemetryInjection() {
             return { view: bestView, convId, uiModel };
         }
 
+        function ensureDedupeStyle() {
+            const target = document.head || document.documentElement;
+            if (!target) return;
+            let dedupe = document.getElementById('codex-telemetry-rail-dedupe');
+            if (!dedupe) {
+                dedupe = document.createElement('style');
+                dedupe.id = 'codex-telemetry-rail-dedupe';
+                dedupe.textContent = '.ag-ctx-monitor-host, .ag-ctx-speed-host, #ag-ctx-card-portal { display: none !important; }';
+                target.appendChild(dedupe);
+            }
+        }
+
         function buildDom() {
+            ensureDedupeStyle();
             if (hostEl && hostEl.isConnected && shadowRoot && els) return;
             const old = document.getElementById(HOST_ID);
             if (old) old.remove();

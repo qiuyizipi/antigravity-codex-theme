@@ -4,7 +4,7 @@
 >
 > 适用版本：Antigravity 2.x 全系列（已专门适配 v2.34.0+ / v2.35.1 `app.asar.unpacked` 原生依赖拆分架构）
 >
-> 设计目标：逐像素对齐本地 OpenAI Codex 桌面端的视觉规范，彻底根治 Windows Electron 下 Antigravity 2.34+ 字体发白、350 细字重断层与排版拥挤问题，呈现纯白无缝画布、`#F8F9FC` 清亮侧边栏、实墨 16px/1.66 正文、两档强调黑度层次与右侧可拖动实时监测面板。
+> 默认模式：保留新版 Antigravity 官方原生页面样式（不覆盖外观与标题栏），仅部署右侧可拖动实时监测小窗口与可选中文汉化（如需启用旧版 Codex CSS 主题，命令行追加 `--with-theme` 即可）。
 >
 > 安全承诺：纯 Node.js 原地修补 Chromium Pickle ASAR 索引，完整保留全部 `unpacked` 原生二进制依赖，写入前执行 `vm.Script` 语法校验，并自动备份支持秒级无损还原。
 

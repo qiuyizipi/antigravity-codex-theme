@@ -379,13 +379,31 @@ test('non-destructive temp ASAR patch and strip round-trip preserves syntax and 
             const css = fs.readFileSync(path.join(ROOT_DIR, 'codex_theme.css'), 'utf8');
             const origPreload = stripCodexTheme(readAsarFile(tmpAsar, 'dist/preload.js').toString('utf8'));
             const origMain = stripMainHotCss(readAsarFile(tmpAsar, 'dist/main.js').toString('utf8'));
+            const beforeInfo = inspectAsar(tmpAsar);
 
-            const nextPreload = origPreload + buildInjection(css, null);
+            // 1) Default rail-only mode: preserves native Antigravity UI, injects telemetry rail + dedupe style only
+            const railOnlyInject = buildInjection('', null, { noTheme: true });
+            assert.ok(railOnlyInject.includes('codex-telemetry-rail-dedupe'));
+            assert.equal(railOnlyInject.includes('antigravity-codex-theme-patch'), false);
+            assert.equal(railOnlyInject.includes('window:set-title-bar-overlay'), false);
+            const railPreload = origPreload + railOnlyInject;
             const nextMain = origMain + buildMainHotCssInjection(null);
-            new vm.Script(nextPreload);
+            new vm.Script(railPreload);
             new vm.Script(nextMain);
 
-            const beforeInfo = inspectAsar(tmpAsar);
+            patchAsarInPlace(tmpAsar, tmpAsar, {
+                'dist/preload.js': railPreload,
+                'dist/main.js': nextMain,
+            });
+            const railInfo = inspectAsar(tmpAsar);
+            assert.equal(railInfo.syntaxValid, true);
+            assert.equal(railInfo.hasCodexTheme, false);
+            assert.equal(railInfo.hasTelemetryRail, true);
+            assert.equal(railInfo.unpackedCount, beforeInfo.unpackedCount);
+
+            // 2) Full --with-theme opt-in mode
+            const nextPreload = origPreload + buildInjection(css, null, { noTheme: false });
+            new vm.Script(nextPreload);
             patchAsarInPlace(tmpAsar, tmpAsar, {
                 'dist/preload.js': nextPreload,
                 'dist/main.js': nextMain,
@@ -396,7 +414,7 @@ test('non-destructive temp ASAR patch and strip round-trip preserves syntax and 
             assert.equal(afterInfo.hasTelemetryRail, true);
             assert.equal(afterInfo.unpackedCount, beforeInfo.unpackedCount);
 
-            // Strip round-trip
+            // 3) Strip round-trip
             const strippedPreload = stripCodexTheme(readAsarFile(tmpAsar, 'dist/preload.js').toString('utf8'));
             const strippedMain = stripMainHotCss(readAsarFile(tmpAsar, 'dist/main.js').toString('utf8'));
             patchAsarInPlace(tmpAsar, tmpAsar, {
